@@ -2,7 +2,7 @@ clear; close all; clc;
 
 % Paths
 base_path = '/home/acatalano/Desktop/Intuitive';
-addpath('/home/acatalano/Documents/fieldtrip-20241219');
+addpath '/home/acatalano/Matlab/fieldtrip-20250106';
 ft_defaults;
 
 load(fullfile(base_path, 'grandavg1_IE.mat')); % EO1
