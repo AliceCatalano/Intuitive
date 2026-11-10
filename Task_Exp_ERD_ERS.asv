@@ -1,0 +1,126 @@
+clear, close all
+base_path = '/home/acatalano/Desktop/Intuitive/IE_Task/IE_sixRep_behav/EEG';
+% base_path = '/home/acatalano/Desktop/Intuitive/IE_Task/Task2';
+
+load(fullfile(base_path, 'Task1grasp_Exp_allSbj.mat'));   % ERD epochs: locked to grasp onset
+load(fullfile(base_path, 'Task1exit_Exp_allSbj.mat'));    % ERS epochs: locked to needle exit
+% load(fullfile(base_path, 'Task2grasp_Exp_allSbj.mat'));   % ERD epochs: locked to grasp onset
+% load(fullfile(base_path, 'Task2exit_Exp_allSbj.mat'));    % ERS epochs: locked to needle exit
+
+nSubj  = size(Task1grasp_Exp_allSbj, 1);
+nTrial = size(Task1grasp_Exp_allSbj, 2);   % 80 slots
+
+NUM_SCENARIOS = 20;
+NUM_POINTS    = 4;
+
+%% ERD time axis: epoch locked to grasp onset, window [-0.8, 1.5]
+time_ERD = -0.8:0.05:1.5;
+timeERDS  = find(time_ERD >= -0.5, 1, 'first');   % -0.5s pre-grasp
+timeERDE  = find(time_ERD <=  1.0, 1, 'last');    %  1.0s post-grasp
+
+% ERS time axis: epoch locked to needle exit, window [-2.5, 0.5]
+time_ERS = -2.5:0.05:0.5;
+timeERSS  = find(time_ERS >= -2.0, 1, 'first');   % -2.0s pre-exit
+timeERSE  = find(time_ERS <=  0.0, 1, 'last');    %  0.0s at exit
+
+freq = 2:0.5:40;
+bs   = find(freq == 15);   % beta 15 Hz
+be   = find(freq == 25);   % beta 25 Hz
+
+ERD_values        = nan(nSubj, nTrial);
+ERS_values        = nan(nSubj, nTrial);
+modulation_values = nan(nSubj, nTrial);
+
+for i = 1:nSubj
+    for j = 1:nTrial
+
+        % --- ERD from grasp-locked epochs ---
+        erdPower = squeeze(Task1grasp_Exp_allSbj(i, j, :, :, :));
+        if ~all(isnan(erdPower(:)))
+            ERD_values(i,j) = min(nanmean(nanmean(erdPower(:, bs:be, timeERDS:timeERDE), 1), 2));
+        end
+
+        % --- ERS from exit-locked epochs ---
+        ersPower = squeeze(Task2exit_Exp_allSbj(i, j, :, :, :));
+        if ~all(isnan(ersPower(:)))
+            ERS_values(i,j) = max(nanmean(nanmean(ersPower(:, bs:be, timeERSS:timeERSE), 1), 2));
+        end
+
+        % --- Modulation ---
+        if ~isnan(ERD_values(i,j)) && ~isnan(ERS_values(i,j))
+            modulation_values(i,j) = abs(ERS_values(i,j) - ERD_values(i,j));
+        end
+    end
+end
+
+save(fullfile(base_path, 'ERD_ERS_Modulation_Task1grasp_Exp.mat'), 'ERD_values', 'ERS_values', 'modulation_values');
+
+%% Reshape to (nSubj x nScenarios x nPoints)
+
+load(fullfile(base_path, 'ERD_ERS_Modulation_Task1grasp_Exp.mat'))
+ERD_3d = reshape(ERD_values,        nSubj, NUM_SCENARIOS, NUM_POINTS);
+ERS_3d = reshape(ERS_values,        nSubj, NUM_SCENARIOS, NUM_POINTS);
+Mod_3d = reshape(modulation_values, nSubj, NUM_SCENARIOS, NUM_POINTS);
+
+%% ---- PLOT 1: per suture point (averaged across scenarios) ----
+ERD_pt = squeeze(nanmean(ERD_3d, 2));
+ERS_pt = squeeze(nanmean(ERS_3d, 2));
+Mod_pt = squeeze(nanmean(Mod_3d, 2));
+
+figure('Position',[100 100 900 400]);
+subplot(1,2,1);
+errorbar(1:NUM_POINTS, nanmean(ERD_pt,1), nanstd(ERD_pt,0,1), 'o-', 'LineWidth',2,'Color',[0.2 0.4 0.8]);
+hold on;
+errorbar(1:NUM_POINTS, nanmean(ERS_pt,1), nanstd(ERS_pt,0,1), 's-', 'LineWidth',2,'Color',[0.2 0.7 0.3]);
+xlabel('Suture point'); ylabel('Beta power (norm)');
+xticks(1:NUM_POINTS); xticklabels({'Pt1','Pt2','Pt3','Pt4'});
+title('ERS-D per point'); 
+subplot(1,2,2);
+errorbar(1:NUM_POINTS, nanmean(Mod_pt,1), nanstd(Mod_pt,0,1), 'd-', 'LineWidth',2,'Color',[0.8 0.3 0.1]);
+xlabel('Suture point'); ylabel('|ERS - ERD|');
+xticks(1:NUM_POINTS); xticklabels({'Pt1','Pt2','Pt3','Pt4'});
+title('Modulation per point'); 
+sgtitle('Beta metrics per suture point (mean +/- SD across scenarios)');
+
+%% ---- PLOT 2: per scenario (averaged across points) ----
+ERD_sc = squeeze(nanmean(ERD_3d, 3));
+ERS_sc = squeeze(nanmean(ERS_3d, 3));
+Mod_sc = squeeze(nanmean(Mod_3d, 3));
+
+figure('Position',[100 100 900 400]);
+subplot(1,2,1);
+errorbar(1:NUM_SCENARIOS, nanmean(ERD_sc,1), nanstd(ERD_sc,0,1), 'o-', 'LineWidth',2,'Color',[0.2 0.4 0.8]);
+hold on;
+errorbar(1:NUM_SCENARIOS, nanmean(ERS_sc,1), nanstd(ERS_sc,0,1), 's-', 'LineWidth',2,'Color',[0.2 0.7 0.3]);
+xlabel('Scenario'); ylabel('Beta power (norm)');
+xticks(1:NUM_SCENARIOS); title('ERS-D per scenario'); grid on;
+
+subplot(1,2,2);
+errorbar(1:NUM_SCENARIOS, nanmean(Mod_sc,1), nanstd(Mod_sc,0,1), 'd-', 'LineWidth',2,'Color',[0.8 0.3 0.1]);
+xlabel('Scenario'); ylabel('|ERS - ERD|');
+xticks(1:NUM_SCENARIOS); title('Modulation per scenario'); grid on;
+sgtitle('Beta metrics per scenario (mean +/- SD across suture points)');
+
+%% ---- PLOT 3: heatmaps (scenario x point) ----
+mean_ERD_grid = squeeze(nanmean(ERD_3d, 1));   % nScenarios x nPoints
+mean_ERS_grid = squeeze(nanmean(ERS_3d, 1));
+mean_Mod_grid = squeeze(nanmean(Mod_3d, 1));
+
+pt_labels  = {'Pt1','Pt2','Pt3','Pt4'};
+scn_labels = arrayfun(@(x) sprintf('Scn%d',x), 1:NUM_SCENARIOS, 'UniformOutput',false);
+
+figure('Position',[100 100 1200 400]);
+for idx = 1:3
+    subplot(1,3,idx);
+    if idx==1, grid_data = mean_ERD_grid; ttl = 'Mean ERD';
+    elseif idx==2, grid_data = mean_ERS_grid; ttl = 'Mean ERS';
+    else, grid_data = mean_Mod_grid; ttl = 'Mean Modulation';
+    end
+    imagesc(grid_data);
+    colorbar; colormap(flipud(hot));
+    xlabel('Suture point'); ylabel('Scenario');
+    xticks(1:NUM_POINTS);    xticklabels(pt_labels);
+    yticks(1:NUM_SCENARIOS); yticklabels(scn_labels);
+    title(ttl);
+end
+sgtitle('Beta metrics heatmap — scenario x suture point');
