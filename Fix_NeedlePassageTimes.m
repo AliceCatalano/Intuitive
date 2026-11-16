@@ -2,12 +2,12 @@ clear; clc;
 
 mat_path = '/home/acatalano/Desktop/Intuitive/DataStructures/NeedlePassageTimes_IR.mat';
 
-SUBJ_NAME    = 'IR25';
-SCENARIO_NUM = 6;
+SUBJ_NAME    = 'IR10';
+SCENARIO_NUM = 1;
 TRIAL_NUM    = 2;
-POINT_NUM    = 2;
+POINT_NUM    = 3;
 FIX_TYPE     = 'exit';   % 'entry' or 'exit' or 'nan' to invalidate both
-NEW_VALUE    = 90.5726;    % ignored if FIX_TYPE is 'nan'
+NEW_VALUE    = 79.8370;    % ignored if FIX_TYPE is 'nan'
 
 A = load(mat_path);
 subjects   = A.subjects;

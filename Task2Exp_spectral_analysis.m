@@ -113,6 +113,7 @@ fprintf('Saved.\n');
 %% FIGURE 1: Mean corrected spectrum per subject per ROI
 % averaged across all slots — all subjects overlaid — color by subject
 % line style by peak band: solid=alpha(8-14) dashed=low-beta(14-20)
+load(fullfile(base_path,'Task2_CorrSpec_Experts.mat'));
 colors_subj = lines(nSubj);
 epoch_labels = {'Exit epoch','Grasp epoch'};
 CorrSpec_list = {CorrSpec_exit, CorrSpec_grasp};

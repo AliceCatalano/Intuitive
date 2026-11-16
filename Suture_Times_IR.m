@@ -3,7 +3,7 @@ clear; clc;
 base_path    = '/home/acatalano/Desktop/Intuitive/BehavioraldVRKData/IR_SaveData';
 out_path     = '/home/acatalano/Desktop/Intuitive/DataStructures/NeedlePassageTimes_IR.mat';
 
-subjects     = {'IR25'};%'IR02','IR04','IR05','IR06','IR07','IR08','IR09','IR10','IR11','IR12','IR13','IR14','IR16','IR17', ...
+subjects     = {'IR10'};%'IR02','IR04','IR05','IR06','IR07','IR08','IR09','IR10','IR11','IR12','IR13','IR14','IR16','IR17', ...
    % 'IR18','IR19','IR21','IR22','IR23','IR24','IR25'
 
 NUM_SUBJECTS  = length(subjects);

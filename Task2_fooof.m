@@ -32,7 +32,7 @@ ROI.Visual     = [29, 30, 31];
 ROI.Frontal    = [4,  5,  6];
 roi_names = fieldnames(ROI);
 nROI      = numel(roi_names);
-
+%%
 fooof_settings = struct();
 fooof_settings.peak_width_limits = [1 12];
 fooof_settings.max_n_peaks       = 4;
@@ -159,9 +159,10 @@ end
 save(fullfile(base_path,'Task2_FOOOF_Experts.mat'), 'FOOOF_exit','FOOOF_grasp','roi_names','subjects');
 fprintf('Saved Task2_FOOOF_Experts.mat\n');
 
-% BEHAVIORAL DATA: suture duration per rep per point
+%% BEHAVIORAL DATA: suture duration per rep per point
 % ExitTimes and EntryTimes: [nSubj x NUM_REPS x NUM_SUTURES]
 % suture_dur(s, rep, pt) = time from entry to exit
+load(fullfile(base_path,'Task2_FOOOF_Experts.mat'));
 suture_dur = ExitTimes - EntryTimes;
 % [nSubj x NUM_REPS x NUM_POINTS]
 
@@ -201,7 +202,7 @@ for r = 1:nROI
         end
     end
     sgtitle(sprintf('FOOOF parameters across 20 reps — ROI: %s', roi_names{r}),'Interpreter','none');
-    legend(subjects,'Location','eastoutside','FontSize',7);
+    %legend(subjects,'Location','eastoutside','FontSize',7);
 end
 
 % FIGURE 2: Spectrum overlay per ROI — all subjects mean
@@ -240,7 +241,7 @@ for r = 1:nROI
     text(11,yl(2)*0.9,'α','FontSize',9,'HorizontalAlignment','center');
     text(20,yl(2)*0.9,'β','FontSize',9,'HorizontalAlignment','center');
     xlabel('Hz'); ylabel('Log power - 1/f'); title(roi_names{r},'Interpreter','none');
-    legend('FontSize',6,'Location','northeast'); grid on; hold off;
+    %legend('FontSize',6,'Location','northeast'); grid on; hold off;
 
     subplot(2,4,r+4);
     % same for grasp epoch
@@ -271,7 +272,7 @@ for r = 1:nROI
     yline(0,'k--','LineWidth',0.8,'HandleVisibility','off');
     xlabel('Hz'); ylabel('Log power - 1/f');
     title(sprintf('%s — Grasp',roi_names{r}),'Interpreter','none');
-    legend('FontSize',6,'Location','northeast'); grid on; hold off;
+    %legend('FontSize',6,'Location','northeast'); grid on; hold off;
 end
 sgtitle('Aperiodic-corrected spectrum — solid=alpha dominant  dashed=beta dominant  triangle=peak');
 
@@ -310,7 +311,7 @@ for ep = 1:2
     end
 end
 
-% PRINT FOOOF SUMMARY TABLE
+%% PRINT FOOOF SUMMARY TABLE
 fprintf('\n=== Mean FOOOF parameters per subject — MotorLeft — exit epoch ===\n');
 fprintf('%-8s  %-8s  %-8s  %-8s  %-8s  %-8s  %-8s  %-8s\n', ...
     'Subject','Exp','Offset','AlphaCF','AlphaPow','BetaCF','BetaPow','R2');
@@ -529,7 +530,7 @@ plot(1:NUM_REPS, polyval(p_fit,1:NUM_REPS),'r--','LineWidth',1.5,'HandleVisibili
 [rv,pv] = corr((1:NUM_REPS)', gm(:),'Type','Spearman');
 xlabel('Repetition'); ylabel('Mean suture duration (s)');
 title(sprintf('Behavioral learning curve — Spearman r=%.2f p=%.3f', rv, pv));
-legend('Group mean ± SEM','Location','northeast');
+%legend('Group mean ± SEM','Location','northeast');
 grid on; hold off;
 
 % FIGURE Q2c: First 5 vs Last 5 repetitions comparison

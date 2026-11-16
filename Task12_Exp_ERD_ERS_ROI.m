@@ -228,30 +228,30 @@ for b = 1:nBands
      end
 
     %% Plot 3: heatmaps — rows=ROI, cols=metric
-%     figure('Name', sprintf('%s — %s — heatmaps', save_suffix, band_label), ...
-%         'Position', [50 50 1000 900]);
-% 
-%     for r = 1:nROI
-%         for m = 1:3
-%             D      = data_fields{m};
-%             D_subj = squeeze(D(b,r,:,:));
-%             D_3d = reshape(D_subj, nSubj, NUM_POINTS, NUM_OUTER);  D_3d = permute(D_3d, [1 3 2]); ;
-%             grid_d = squeeze(nanmean(D_3d, 1));
-% 
-%             subplot(nROI, 3, (r-1)*3 + m);
-%             imagesc(grid_d);
-%             colorbar;
-%             colormap(flipud(hot));
-%             xticks(1:NUM_POINTS);   xticklabels(pt_labels);
-%             yticks(1:2:NUM_OUTER);  yticklabels(outer_ticks(1:2:end));
-%             xlabel('Suture point', 'FontSize',8);
-% 
-%             if r == 1, title(metrics{m}, 'FontSize',11,'FontWeight','bold'); end
-%             if m == 1, ylabel(roi_names{r}, 'FontSize',10,'FontWeight','bold'); end
-%         end
-%     end
-%     sgtitle(sprintf('%s — %s: heatmaps %s x point',save_suffix, band_label, outer_label), 'FontSize',13);
-% end
+    figure('Name', sprintf('%s — %s — heatmaps', save_suffix, band_label), ...
+        'Position', [50 50 1000 900]);
+
+    for r = 1:nROI
+        for m = 1:3
+            D      = data_fields{m};
+            D_subj = squeeze(D(b,r,:,:));
+            D_3d = reshape(D_subj, nSubj, NUM_POINTS, NUM_OUTER);  D_3d = permute(D_3d, [1 3 2]); ;
+            grid_d = squeeze(nanmean(D_3d, 1));
+
+            subplot(nROI, 3, (r-1)*3 + m);
+            imagesc(grid_d);
+            colorbar;
+            colormap(flipud(hot));
+            xticks(1:NUM_POINTS);   xticklabels(pt_labels);
+            yticks(1:2:NUM_OUTER);  yticklabels(outer_ticks(1:2:end));
+            xlabel('Suture point', 'FontSize',8);
+
+            if r == 1, title(metrics{m}, 'FontSize',11,'FontWeight','bold'); end
+            if m == 1, ylabel(roi_names{r}, 'FontSize',10,'FontWeight','bold'); end
+        end
+    end
+    sgtitle(sprintf('%s — %s: heatmaps %s x point',save_suffix, band_label, outer_label), 'FontSize',13);
+end
 
 %% Plot 4: Beta vs HighAlpha — rows=ROI, cols=metric
 %  ylims shared within this figure only (across both bands)

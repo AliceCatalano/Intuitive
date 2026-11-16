@@ -1,0 +1,100 @@
+clear; close all;
+restoredefaultpath;
+addpath '/home/acatalano/Documents/MATLAB/fieldtrip-20250106'; ft_defaults;
+addpath '/home/acatalano/Matlab/eeglab_current/eeglab2026.0.0'; eeglab nogui;
+
+OUT='/tmp/claude-1001/-home-acatalano-Desktop-Intuitive/cd38b9b3-6422-4779-b5e1-85fe8d66cd60/scratchpad/figs/';
+D='/home/acatalano/Desktop/Intuitive/DataStructures/';
+E2=load('/home/acatalano/Desktop/Intuitive/IE_Task/Task2/ERD_ERS_Modulation_Task2_ROI_bands.mat');
+R=load([D 'ERD_ERS_Modulation_IR_ROI_bands.mat']);
+F=load([D 'Task_FOOOF_Residents.mat']);
+C=load([D 'Task_ClusterFirstLast_Residents.mat']);
+
+rn=E2.roi_names; cE=[0.15 0.35 0.7]; cR=[0.85 0.4 0.1];
+NS=6;NR=10;NP=4;
+mk=@() figure('Visible','on','Position',[50 50 1400 700],'Color','w');
+sv=@(f,n) print(f,[OUT n],'-dpng','-r110');
+
+%% Fig 1: group comparison ERD / ERS / Mod (beta, alpha), motor+frontal ROIs
+f=mk(); 
+met={'ERD','ERS','Mod'}; rois=[1 2 3 4]; bnm={'Beta','Alpha'};
+for b=1:2
+    for m=1:3
+      subplot(2,3,(b-1)*3+m); hold on;
+      for k=1:numel(rois)
+        r =rois(k);
+        e =mean( squeeze( E2.([met{m} '_all'])(b,r,:,:)), 2, 'omitnan'); 
+        s =mean( squeeze(R.([met{m} '_all'])(b,r,:,:)), 2, 'omitnan');
+        bar(k-0.18,mean(e,'omitnan'), 0.33,'FaceColor',cE,'FaceAlpha',0.6); 
+        bar(k+0.18,mean(s,'omitnan'), 0.33, 'FaceColor', cR, 'FaceAlpha', 0.6);
+        scatter(k-0.18+0.05*randn(size(e)), e, 14, cE, 'filled'); 
+        scatter(k+0.18+0.05*randn(size(s)), s, 14, cR, 'filled');
+      end
+      xticks(1:4); xticklabels(rn(rois)); title(sprintf('%s | %s', bnm{b}, met{m})); grid on; yline(0, 'k-');
+      if b==1&&m==1,  legend({'Experts', 'Residents'}, 'Location', 'southeast'); end
+    end 
+end
+sgtitle('ERD,  ERS,  modulation per ROI: bars = group mean of subject means');
+sv(f, 'fig1_groups.png'); 
+
+%% Fig 2: ERS beta/Mod beta left motor: experts across 20 repetitions; residents across scenarios and points
+f = mk();
+ee = squeeze(E2.ERS_all(1,1,:,:)); em = squeeze(E2.Mod_all(1,1,:,:));
+ex = @(A) squeeze(mean(reshape(A,10,4,20),2,'omitnan')); % subj x rep
+subplot(2,3,1); errorbar(1:20,mean(ex(ee),1,'omitnan'),std(ex(ee),0,1,'omitnan')/sqrt(10),'-o','Color',cE,'LineWidth',1.4); title('Experts: ERS beta, left motor, per repetition'); xlabel('Repetition'); ylabel('ERS'); grid on;
+subplot(2,3,4); errorbar(1:20,mean(ex(em),1,'omitnan'),std(ex(em),0,1,'omitnan')/sqrt(10),'-o','Color',cE,'LineWidth',1.4); title('Experts: modulation beta, left motor'); xlabel('Repetition'); ylabel('Modulation'); grid on;
+rs = squeeze(R.ERS_all(1,1,:,:)); rm = squeeze(R.Mod_all(1,1,:,:));
+sc = @(A) squeeze(mean(mean(reshape(A,21,4,10,6),2,'omitnan'),3,'omitnan')); % subj x scenario
+pt = @(A) squeeze(mean(mean(reshape(A,21,4,10,6),3,'omitnan'),4,'omitnan')); % subj x point
+sem = @(A) std(A,0,1,'omitnan')./sqrt(sum(~isnan(A),1));
+subplot(2,3,2); errorbar(1:6,mean(sc(rs),1,'omitnan'),sem(sc(rs)),'-o','Color',cR,'LineWidth',1.4); title('Residents: ERS beta, left motor, per scenario'); xlabel('Scenario'); grid on;
+subplot(2,3,5); errorbar(1:6,mean(sc(rm),1,'omitnan'),sem(sc(rm)),'-o','Color',cR,'LineWidth',1.4); title('Residents: modulation beta, per scenario'); xlabel('Scenario'); grid on;
+pe = @(A) squeeze(mean(mean(reshape(A,10,4,20),3,'omitnan'),1,'omitnan'));
+subplot(2,3,3); hold on; errorbar(1:4,mean(pt(rs),1,'omitnan'),sem(pt(rs)),'-o','Color',cR,'LineWidth',1.4); plot(1:4,pe(ee),'--s','Color',cE,'LineWidth',1.4); title('ERS beta, left motor, per suture point'); xlabel('Suture point'); legend({'Residents','Experts'},'Location','best'); grid on;
+subplot(2,3,6); hold on; errorbar(1:4,mean(pt(rm),1,'omitnan'),sem(pt(rm)),'-o','Color',cR,'LineWidth',1.4); plot(1:4,pe(em),'--s','Color',cE,'LineWidth',1.4); title('Modulation beta, left motor, per suture point'); xlabel('Suture point'); grid on;
+sgtitle('Learning and within-suture behaviour (mean +- SEM over subjects; experts dashed in the point panels)');
+sv(f,'fig2_learning.png'); close(f);
+
+%% Fig 3: resident mean spectra successful vs not, Grasp and Exit
+f = mk(); gc = {[0.1 0.5 0.2],[0.8 0.2 0.2]}; freq=F.freq;
+[pp,rr,ss]=ndgrid(1:NP,1:NR,1:NS); slotSc=ss(:)'; slotRp=rr(:)';
+succ=nan(21,240); for s=1:21, for k=1:240, succ(s,k)=F.Success(s,slotSc(k),slotRp(k)); end,end
+SP={F.Spec_grasp,F.Spec_exit}; el={'Grasp','Exit'};
+for e=1:2, for r=1:4
+  subplot(2,4,(e-1)*4+r); hold on;
+  for g=1:2
+    sm=nan(21,numel(freq));
+    for s=1:21, sel=succ(s,:)==(g==1); sp=squeeze(SP{e}(s,r,sel,:)); if ~isempty(sp)&&any(~isnan(sp(:))), sm(s,:)=mean(log10(sp),1,'omitnan'); end, end
+    mu=mean(sm,1,'omitnan'); se=std(sm,0,1,'omitnan')./sqrt(sum(~isnan(sm(:,1))));
+    fill([freq fliplr(freq)],[mu+se fliplr(mu-se)],gc{g},'FaceAlpha',0.2,'EdgeColor','none','HandleVisibility','off'); plot(freq,mu,'Color',gc{g},'LineWidth',1.6);
+  end
+  xlim([4 35]); grid on; title(sprintf('%s | %s',el{e},rn{r})); xlabel('Hz'); ylabel('log10 power');
+  if r==1&&e==1, legend({'Successful (PS>=75)','Not successful'},'Location','southwest'); end
+end,end
+sgtitle('Residents: mean spectrum, successful vs not successful repetitions (shading = SEM over subjects)');
+sv(f,'fig3_spectra.png'); close(f);
+
+%% Fig 4: dominant / alpha / beta peak frequency distribution, residents
+f=mk(); 
+for e=1:2, FD={F.FOOOF_grasp,F.FOOOF_exit}; 
+  for r=1:4
+    subplot(2,4,(e-1)*4+r); v=squeeze(FD{e}.dom_cf(:,r,:)); r2=squeeze(FD{e}.r_squared(:,r,:));
+    histogram(v(~isnan(v)),4:1:35,'FaceColor',cR); xlabel('Dominant peak frequency (Hz)'); ylabel('# slots'); grid on; title(sprintf('%s | %s',el{e},rn{r}));
+  end
+end
+sgtitle('Residents: distribution of the dominant FOOOF peak frequency (two humps: alpha and beta)');
+sv(f,'fig4_peakhist.png'); close(f);
+
+%% Fig 5: cluster topographies (last - first), residents
+EEG=pop_loadset('filename','IR06_EO_downS_filt.set','filepath','/home/acatalano/Desktop/Intuitive/');
+f=figure('Visible','off','Position',[50 50 1500 480],'Color','w');
+cl={{'graspERD','Alpha'},{'exitERS','Theta'},{'exitERS','Alpha'}};
+for i=1:3
+  s=C.Results.(cl{i}{1}).(cl{i}{2}); el_=[];
+  for k=find([s.negclusters.prob]<0.05), el_=[el_; find(s.negclusterslabelmat==k)]; end
+  subplot(1,3,i); topoplot(s.stat,EEG.chanlocs,'gridscale',100,'headrad',0.61,'electrodes','off','maplimits',[-5 5],'emarker2',{el_,'o',[0 0 0],5,1});
+  colorbar; title(sprintf('%s | %s',cl{i}{1},cl{i}{2}));
+end
+sgtitle('Residents: t-map of last minus first repetition (black dots = channels of the significant cluster)');
+sv(f,'fig5_clusters.png'); close(f);
+disp('done');
