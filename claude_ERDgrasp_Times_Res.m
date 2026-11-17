@@ -1,4 +1,4 @@
-% ERDgrasp_Times_Res.m
+% claude_ERDgrasp_Times_Res.m
 % RESIDENTS (IR): for each subject, scenario, repetition and suture point,
 % finds the last MTML or MTMR grasp START that occurs before the needle entry.
 % This is the anchor for the beta ERD epoch (grasp-locked).

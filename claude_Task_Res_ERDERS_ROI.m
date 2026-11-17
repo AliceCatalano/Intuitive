@@ -1,4 +1,4 @@
-% Task_Res_ERDERS_ROI.m
+% claude_Task_Res_ERDERS_ROI.m
 % RESIDENTS (IR): beta and alpha ERD, ERS and modulation per ROI and slot.
 % Same definitions as the experts (Task12_Exp_ERD_ERS_ROI.m):
 %   ROIs (channel indices in the reference order, as for the experts):
@@ -9,16 +9,17 @@
 %   Modulation = |ERS - ERD|  (only where both exist for the same slot)
 %
 % Slots: 240 = 6 scenarios x 10 repetitions x 4 points,
-%        slot = (scenario-1)*40 + (rep-1)*4 + point  (see Task_Res_FieldtripERDERS.m)
+%        slot = (scenario-1)*40 + (rep-1)*4 + point  (see claude_Task_Res_FieldtripERDERS.m)
 % Slots without an epoch are NaN and stay NaN (skipped / missing / not completed).
 %
-% Input : <subj>_IR_graspERD_TFR.mat , <subj>_IR_exitERS_TFR.mat  (Task_Res_TFR.m)
+% Input : <subj>_IR_graspERD_TFR.mat , <subj>_IR_exitERS_TFR.mat  (claude_Task_Res_TFR.m)
 % Output: ERD_ERS_Modulation_IR_ROI_bands.mat
 %         ERD_all, ERS_all, Mod_all  [nBands x nROI x nSubj x 240]
 %         and the same reshaped as [nBands x nROI x nSubj x 6 x 10 x 4]
 %         (scenario, repetition, point)
 
 clear; close all; clc;
+addpath(fileparts(mfilename('fullpath')));   % so claude_figure_right.m is found
 
 base_path  = '/home/acatalano/Desktop/Intuitive/IR_Task/ERDS';
 times_file = '/home/acatalano/Desktop/Intuitive/DataStructures/GraspERD_Times_IR.mat';
@@ -177,7 +178,7 @@ function plot_ERDERS_ROI(ERD_6d, ERS_6d, Mod_6d, roi_names, BANDS, saveFigs, fig
     for b = 1:nBands
         for a = 1:numel(axes_def)
             ad  = axes_def(a);
-            fig = figure('Name', sprintf('IR %s %s', BANDS(b).name, ad.name), 'Position', [50 50 1300 900]);
+            fig = claude_figure_right(sprintf('IR %s %s', BANDS(b).name, ad.name), 1300, 900);
             ylimsCol = nan(3, 2);
 
             for r = 1:nROI
@@ -218,7 +219,7 @@ function plot_ERDERS_ROI(ERD_6d, ERS_6d, Mod_6d, roi_names, BANDS, saveFigs, fig
     end
 
     % Beta vs Alpha by scenario
-    fig = figure('Name', 'IR Beta vs Alpha by scenario', 'Position', [50 50 1300 900]);
+    fig = claude_figure_right('IR Beta vs Alpha by scenario', 1300, 900);
     for r = 1:nROI
         for m = 1:3
             subplot(nROI, 3, (r-1)*3 + m); hold on;

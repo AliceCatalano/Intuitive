@@ -1,4 +1,4 @@
-% Task_Res_TFR.m
+% claude_Task_Res_TFR.m
 % RESIDENTS (IR): time-frequency analysis of the graspERD and exitERS epochs.
 % Parameters identical to the experts (Task2_fft_Exp.m):
 %   mtmconvol, hann taper, pad nextpow2, foi 2:0.5:40 Hz, 0.2 s window,

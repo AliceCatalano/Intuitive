@@ -1,4 +1,4 @@
-% Task_Res_FieldtripERDERS.m
+% claude_Task_Res_FieldtripERDERS.m
 % RESIDENTS (IR): converts the epoched datasets to FieldTrip raw data.
 % Input : <subj>_IR_graspERD_epochs.set , <subj>_IR_exitERS_epochs.set
 % Output: <subj>_IR_graspERD_FT.mat , <subj>_IR_exitERS_FT.mat  (variable: data)

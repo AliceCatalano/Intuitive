@@ -1,6 +1,6 @@
-% Task_Res_EpochsERDERS.m
+% claude_Task_Res_EpochsERDERS.m
 % RESIDENTS (IR): epochs the two event datasets produced by
-% Task_events_Residents_v2.m
+% claude_Task_events_Residents_v2.m
 %   graspERD : lock events Grasp_S#_T#_P#   window [-0.8  1.5] s
 %   exitERS  : lock events Ext_S#_T#_P#     window [-2.5  0.5] s
 % Input : <subj>_IR_graspERD_events.set , <subj>_IR_exitERS_events.set

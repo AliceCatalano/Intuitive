@@ -1,4 +1,4 @@
-% Task_Res_ERDERS_Last3.m
+% claude_Task_Res_ERDERS_Last3.m
 % RESIDENTS (IR): beta / alpha ERD, ERS and modulation computed ONLY on the
 % three successful repetitions that allowed the resident to move to the next
 % scene (score >= 75% on three consecutive trials).
@@ -9,7 +9,7 @@
 % Numbers are the ORIGINAL repetition numbers, so they index the 10-repetition
 % grid directly. Footnote symbols (* dagger etc.) in the CSV are ignored.
 %
-% Values come from Task_Res_ERDERS_ROI.m (same definitions: ROI, bands, windows),
+% Values come from claude_Task_Res_ERDERS_ROI.m (same definitions: ROI, bands, windows),
 % already NaN for skipped repetitions / repetitions without usable EEG events.
 %
 % Output (ERD_ERS_Modulation_IR_Last3.mat), per band x ROI x subject x scenario:
@@ -17,9 +17,10 @@
 %   ERD_last3_pt, ERS_last3_pt, Mod_last3_pt   ... x 4 points (mean over the 3 reps)
 %   N_ERD, N_ERS, N_Mod                  slots actually available (max 12) [subj x 6]
 %   Last3Reps                            {subject, scenario} -> repetitions used
-% Requires: ERD_ERS_Modulation_IR_ROI_bands.mat (run Task_Res_ERDERS_ROI.m first)
+% Requires: ERD_ERS_Modulation_IR_ROI_bands.mat (run claude_Task_Res_ERDERS_ROI.m first)
 
 clear; close all; clc;
+addpath(fileparts(mfilename('fullpath')));   % so claude_figure_right.m is found
 
 erd_file = '/home/acatalano/Desktop/Intuitive/DataStructures/ERD_ERS_Modulation_IR_ROI_bands.mat';
 csv_file = '/home/acatalano/Desktop/Intuitive/last3_successful_residents.csv';
@@ -79,7 +80,7 @@ for s = 1:nSubj
         if isempty(reps), continue; end
         for m = 1:3
             X = reshape(src{m}(:, :, s, sc, reps, :), nB, nR, numel(reps), nPt);   % [band roi rep pt]
-            res.(metrics{m})(:, :, s, sc)    = mean(mean(X, 4, 'omitnan'), 3, 'omitnan');
+            res.(metrics{m})(:, :, s, sc)    =  mean(mean(X, 4, 'omitnan'), 3, 'omitnan');
             res.([metrics{m} '_pt'])(:, :, s, sc, :) = reshape(mean(X, 3, 'omitnan'), nB, nR, 1, 1, nPt);
             Ncount(s, sc, m) = nnz(~isnan(squeeze(X(1, 1, :, :))));
         end
@@ -130,7 +131,7 @@ function plot_last3(ERD, ERS, Mod, ERDp, ERSp, Modp, roi_names, BANDS, saveFigs,
 
     for b = 1:nB
         for view = 1:2
-            fig = figure('Name', sprintf('IR Last3 %s %d', BANDS(b).name, view), 'Position', [50 50 1200 900]);
+            fig = claude_figure_right(sprintf('IR Last3 %s %d', BANDS(b).name, view), 1200, 900);
             ylc = nan(3,2);
             for r = 1:nR
                 for m = 1:3

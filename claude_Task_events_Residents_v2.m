@@ -1,10 +1,10 @@
-% Task_events_Residents_v2.m
+% claude_Task_events_Residents_v2.m
 % Inserts events into the continuous resident EEG and saves TWO datasets per
 % resident, to be epoched separately:
 %   <subj>_IR_graspERD_events.set : Grasp_S#_T#_P#  last grasp start before needle
-%                                                   entry (ERDgrasp_Times_Res.m)
+%                                                   entry (claude_ERDgrasp_Times_Res.m)
 %   <subj>_IR_exitERS_events.set  : Ext_S#_T#_P#    validated needle exit
-%                                                   (ExitERS_Times_Res.m)
+%                                                   (claude_ExitERS_Times_Res.m)
 % Each dataset contains ONLY its own new events (events of previous runs / old
 % scripts are removed from both).
 % Replaces the old Task_events_Residents.m (kept untouched).
@@ -17,7 +17,7 @@
 % Behavioural times (grasp, exit) are seconds from MS.
 %
 % A repetition receives events ONLY if all of these hold:
-%   1) it is valid in the ERDgrasp_Times_Res.m / ExitERS_Times_Res.m output
+%   1) it is valid in the claude_ERDgrasp_Times_Res.m / claude_ExitERS_Times_Res.m output
 %      (skip list applied: skipped repetitions are NaN there)
 %   2) both MS and ME exist in the EEG for that scenario/repetition
 %      (no fallback to S: S is ~30 s before the real start)

@@ -1,7 +1,7 @@
-% ExitERS_Times_Res.m
+% claude_ExitERS_Times_Res.m
 % RESIDENTS (IR): validated needle-exit times, anchor of the exit ERS epoch.
 %
-% Starts from ExitTimes_Valid / EntryTimes_Valid saved by ERDgrasp_Times_Res.m,
+% Starts from ExitTimes_Valid / EntryTimes_Valid saved by claude_ERDgrasp_Times_Res.m,
 % i.e. repetitions in the skip list are ALREADY NaN (one skip list, one place).
 % Repetitions never performed / without needle passage are NaN as well.
 %
@@ -17,7 +17,7 @@
 %   ValidExitTimes  [nSubj x 6 x 10 x 4]  validated exit time (s from MS), NaN otherwise
 %   ExitFlagLog     cell {subject, scenario, rep, point, exit, reason}
 %   RepDur, RepStatus, subjects   (copied from GraspERD_Times_IR.mat)
-% Requires: GraspERD_Times_IR.mat  (run ERDgrasp_Times_Res.m first)
+% Requires: GraspERD_Times_IR.mat  (run claude_ERDgrasp_Times_Res.m first)
 
 clear; clc;
 
