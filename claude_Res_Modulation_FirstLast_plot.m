@@ -437,7 +437,8 @@ end
 
 %% =====================================================================================================
 % 12. TESTS (paper-style, paired). Same residents as in the plots (outliers already removed).
-%   For every comparison: Shapiro-Wilk on the paired differences -> paired t-test (normal) or Wilcoxon signed-rank.
+%   For every comparison: Shapiro-Wilk on the paired differences of ALL sets; if any set is non-normal ALL tests are
+%   Wilcoxon signed-rank, otherwise ALL are paired t-tests (one test type per comparison, printed at the top).
 %   (a) POOLED over scenarios: each resident's mean over the scenarios where he has BOTH trials -> one pair per resident.
 %       8 tests (2 bands x 4 ROIs), Holm over these 8.  This is the headline test.
 %   (b) PER SCENARIO (exploratory): Holm over the 6 scenarios, separately for each band and ROI.
@@ -445,6 +446,51 @@ end
 ALPHA = 0.05;
 runTests(dataA, 'first',  'last',       'PART A: first vs last trial',                        BANDS, roi_names, ALPHA);
 runTests(dataB, 'unsucc', 'succ',       'PART B: first unsuccessful vs first successful trial', BANDS, roi_names, ALPHA);
+
+
+%% =====================================================================================================
+% 13. PART A - TWO-WAY REPEATED-MEASURES ANOVA, Scenario (6) x Repetition (first, last), as in the paper
+%   Uses the SAME first/last trials as the plots (earliest / latest repetition WITH a value, outliers removed).
+%   A classic rmANOVA needs every resident to have all 12 cells (6 scenarios x first/last): residents with a
+%   missing cell are left out of THIS test only and listed. (Part B cannot be done this way: too few residents
+%   have all 6 scenarios with an unsuccessful and a successful trial.)
+%   p = Greenhouse-Geisser p if Mauchly is significant, otherwise the plain p. Holm over the 8 band x ROI tests
+%   for each effect.
+% =====================================================================================================
+effNames = {'Scenario', 'Repetition', 'Scenario x Repetition'};
+PUa = nan(nB, nROI, 3);   NNa = nan(nB, nROI);
+for b = 1:nB
+    fA = claude_figure_right(sprintf('rmANOVA modulation %s', BANDS(b).name), 1100, 800);   set(fA, 'Color', 'w');
+    for r = 1:nROI
+        subjV = {};   scnV = [];   repV = {};   valV = [];
+        for s = 1:nS
+            for sc = 1:NS
+                vals = [dataA(b, r, sc, s, 1), dataA(b, r, sc, s, 2)];
+                if any(isnan(vals)), vals = [NaN NaN]; end
+                subjV = [subjV; repmat(subjects(s), 2, 1)];  scnV = [scnV; sc; sc];  repV = [repV; {'first'; 'last'}];  valV = [valV; vals(:)]; %#ok<AGROW>
+            end
+        end
+        Tl  = table(subjV, scnV, repV, valV, 'VariableNames', {'subject', 'scenario', 'rep', 'value'});
+        axA = subplot(2, 2, r);
+        resA = claude_residents_rm2way(Tl, sprintf('Modulation | %s %s', BANDS(b).name, roi_names{r}), axA);
+        ylabel(axA, 'Modulation');
+        if r == 1, legend(axA, {'First trial', 'Last trial'}, 'Location', 'best'); end
+        NNa(b, r) = resA.n;
+        for e = 1:numel(resA.eff), PUa(b, r, e) = resA.eff(e).pUse; end
+    end
+    sgtitle(sprintf('Residents, %s modulation: first vs last trial by scenario (mean +/- SD, residents with all 6 scenarios)', BANDS(b).name));
+    if SAVE_FIGS, print(fA, [D 'Figures_IR_FirstLast/IR_modulation_rmANOVA_' BANDS(b).name '.png'], '-dpng', '-r110'); end
+end
+fprintf('\n=== rmANOVA summary: p used (Greenhouse-Geisser if Mauchly significant) and Holm p over the %d band x ROI tests ===\n', nB * nROI);
+for e = 1:3
+    pv = reshape(PUa(:, :, e), [], 1);   padj = reshape(claude_holm_adjust(pv), nB, nROI);
+    fprintf('\n--- effect: %s ---\n', effNames{e});
+    for b = 1:nB
+        for r = 1:nROI
+            fprintf('%-6s %-12s n=%2d | p=%.4f | p(Holm)=%.4f %s\n', BANDS(b).name, roi_names{r}, NNa(b, r), PUa(b, r, e), padj(b, r), tern(padj(b, r) < 0.05, '<-- significant', ''));
+        end
+    end
+end
 
 
 %% ---------------------------------------------------------------------
@@ -463,22 +509,49 @@ end
 
 function runTests(data, name1, name2, titleStr, BANDS, roi_names, ALPHA)
 % data = [band x ROI x scenario x resident x 2]; (...,1) = condition 1, (...,2) = condition 2 (NaN = resident not in this comparison)
+% ONE test type for ALL the tests of this comparison: Shapiro-Wilk is run on the paired differences of every set
+% (8 pooled + 48 per-scenario); if ANY set is non-normal, ALL tests are Wilcoxon signed-rank, otherwise ALL are paired t-tests.
     [nB, nROI, NS, nS, ~] = size(data);
     fprintf('\n\n############ %s ############\n', titleStr);
     fprintf('Change = %s - %s. "+" means higher in %s.\n', name2, name1, name2);
 
-    % ---- (a) pooled over scenarios ----
-    fprintf('\n(a) POOLED over scenarios, one pair per resident (Holm over %d tests)\n', nB * nROI);
-    fprintf('%-6s %-12s %4s %16s %16s %9s %9s %9s\n', 'band', 'ROI', 'n', ['mean+-SD ' name1], ['mean+-SD ' name2], 'test', 'p', 'p Holm');
-    rowsQ = {};   pp = [];
+    % ---- the sets: pooled over scenarios (one pair per resident) and every scenario ----
+    V1 = cell(nB, nROI, NS + 1);   V2 = cell(nB, nROI, NS + 1);     % index NS+1 = pooled
     for b = 1:nB
         for r = 1:nROI
+            for sc = 1:NS, V1{b, r, sc} = squeeze(data(b, r, sc, :, 1));   V2{b, r, sc} = squeeze(data(b, r, sc, :, 2)); end
             v1 = nan(nS, 1);   v2 = nan(nS, 1);
             for s = 1:nS
                 a = squeeze(data(b, r, :, s, 1));   c = squeeze(data(b, r, :, s, 2));   ok = ~isnan(a) & ~isnan(c);
                 if any(ok), v1(s) = mean(a(ok));   v2(s) = mean(c(ok)); end
             end
-            Q = claude_paired_first_last(v1, v2, ALPHA);
+            V1{b, r, NS + 1} = v1;   V2{b, r, NS + 1} = v2;
+        end
+    end
+
+    % ---- step 1: normality of every set -> one decision for everyone ----
+    swP = nan(nB, nROI, NS + 1);
+    for b = 1:nB, for r = 1:nROI, for k = 1:NS + 1
+        swP(b, r, k) = claude_paired_first_last(V1{b, r, k}, V2{b, r, k}, ALPHA).swP;
+    end, end, end
+    nSets = nnz(~isnan(swP));   nNon = nnz(swP < ALPHA);
+    if nNon > 0, force = 'wilcoxon'; else, force = 't'; end
+    fprintf('\nNormality (Shapiro-Wilk on the paired differences): %d of %d sets are NOT normal (p < %.2f)\n', nNon, nSets, ALPHA);
+    fprintf('  -> ALL tests below use the %s\n', tern(strcmp(force, 't'), 'paired t-test', 'Wilcoxon signed-rank test'));
+    fprintf('  Non-normal pooled sets: '); idx = 0;
+    for b = 1:nB, for r = 1:nROI
+        if swP(b, r, NS + 1) < ALPHA, fprintf('%s %s (p=%.3f)  ', BANDS(b).name, roi_names{r}, swP(b, r, NS + 1)); idx = idx + 1; end
+    end, end
+    if idx == 0, fprintf('none'); end
+    fprintf('\n');
+
+    % ---- (a) pooled over scenarios ----
+    fprintf('\n(a) POOLED over scenarios, one pair per resident (Holm over %d tests)\n', nB * nROI);
+    fprintf('%-6s %-12s %4s %16s %16s %9s %9s %9s\n', 'band', 'ROI', 'n', ['mean+-SD ' name1], ['mean+-SD ' name2], 'ShapiroP', 'p', 'p Holm');
+    rowsQ = {};   pp = [];
+    for b = 1:nB
+        for r = 1:nROI
+            Q = claude_paired_first_last(V1{b, r, NS + 1}, V2{b, r, NS + 1}, ALPHA, force);
             rowsQ(end+1, :) = {BANDS(b).name, roi_names{r}, Q}; %#ok<AGROW>
             pp(end+1) = Q.p; %#ok<AGROW>
         end
@@ -486,18 +559,18 @@ function runTests(data, name1, name2, titleStr, BANDS, roi_names, ALPHA)
     ph = claude_holm_adjust(pp(:))';
     for i = 1:size(rowsQ, 1)
         Q = rowsQ{i, 3};
-        fprintf('%-6s %-12s %4d %16s %16s %9s %9.4f %9.4f %s\n', rowsQ{i, 1}, rowsQ{i, 2}, Q.n, ...
-            sprintf('%.3f+-%.3f', Q.mFirst, Q.sdFirst), sprintf('%.3f+-%.3f', Q.mLast, Q.sdLast), Q.test, Q.p, ph(i), tern(ph(i) < ALPHA, '<-- significant after Holm', ''));
+        fprintf('%-6s %-12s %4d %16s %16s %9.3f %9.4f %9.4f %s\n', rowsQ{i, 1}, rowsQ{i, 2}, Q.n, ...
+            sprintf('%.3f+-%.3f', Q.mFirst, Q.sdFirst), sprintf('%.3f+-%.3f', Q.mLast, Q.sdLast), Q.swP, Q.p, ph(i), tern(ph(i) < ALPHA, '<-- significant after Holm', ''));
     end
 
     % ---- (b) per scenario ----
-    fprintf('\n(b) PER SCENARIO. Entry = n, sign of the change, raw p; * = Holm p < %.2f over the 6 scenarios\n', ALPHA);
+    fprintf('\n(b) PER SCENARIO (%s). Entry = n, sign of the change, raw p; * = Holm p < %.2f over the 6 scenarios\n', tern(strcmp(force, 't'), 'paired t-test', 'Wilcoxon'), ALPHA);
     fprintf('%-6s %-12s', 'band', 'ROI'); fprintf(' %17s', 'Sc1', 'Sc2', 'Sc3', 'Sc4', 'Sc5', 'Sc6'); fprintf('\n');
     for b = 1:nB
         for r = 1:nROI
             Qs = cell(1, NS);   p = nan(1, NS);
             for sc = 1:NS
-                Qs{sc} = claude_paired_first_last(squeeze(data(b, r, sc, :, 1)), squeeze(data(b, r, sc, :, 2)), ALPHA);   p(sc) = Qs{sc}.p;
+                Qs{sc} = claude_paired_first_last(V1{b, r, sc}, V2{b, r, sc}, ALPHA, force);   p(sc) = Qs{sc}.p;
             end
             padj = claude_holm_adjust(p(:))';
             fprintf('%-6s %-12s', BANDS(b).name, roi_names{r});
