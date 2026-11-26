@@ -75,6 +75,11 @@ for k = 1:(1 + NP)
     for e = 1:numel(res.eff), PU(k, e) = res.eff(e).pUse; end
 end
 sgtitle('Residents: first vs last repetition by scenario (mean +/- SD, residents with all 6 scenarios)');
+SAVE_FIGS = true;   % save the figure as PNG (completion time and the 4 point times, first vs last, rmANOVA)
+if SAVE_FIGS
+    if ~exist([D 'Figures_IR_PointTimes'], 'dir'), mkdir([D 'Figures_IR_PointTimes']); end
+    print(f, [D 'Figures_IR_PointTimes/IR_point_times_first_vs_last.png'], '-dpng', '-r110');
+end
 
 fprintf('\n=== Holm across the %d point-time tests (completion time is a single test, not corrected) ===\n', NP);
 for e = 1:3

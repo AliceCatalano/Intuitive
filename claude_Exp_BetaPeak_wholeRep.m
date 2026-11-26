@@ -1,43 +1,41 @@
 % claude_Exp_BetaPeak_wholeRep.m
 % =====================================================================================================
-% EXPERTS, TASK 1 AND TASK 2: WHERE IS THE BETA PEAK in the motor areas, using the WHOLE repetition
-% (not only the event-locked windows of the ERD / ERS analysis).
+% EXPERTS, TASK 1 AND TASK 2: ALPHA AND BETA PEAKS in the motor areas, using the WHOLE repetition
+% (not only the event-locked windows of the ERD / ERS analysis). Same method as claude_Res_AlphaBetaPeak_wholeRep.m.
 %
 % WINDOW OF A REPETITION (a "repetition" = a scenario in Task 1, a repetition in Task 2)
 %   from the marker MS<n> (the go; fallback S<n> in Task 1, R<n> in Task 2) to the LAST valid needle exit of it.
 %   Task 2: exits = events Ext*_R<n> of  <expert>_Task2_exitERS_events.set
-%   Task 1: no events file is saved, so the exits are read as in Task1_ExpEvents_ExitERS.m:
-%           DataStructures/ExitERS_Times_IE.mat (seconds after MS) on <expert>Task1_final.set
+%   Task 1: exits read from DataStructures/ExitERS_Times_IE.mat (seconds after MS) on <expert>Task1_final.set
 %   Excluded in the original scripts (no value here): Task 1 IE02 scenarios 1 and 4, IE10 scenario 6;
 %           Task 2 IE03 rep 10, IE05 rep 9, IE07 rep 15, IE10 rep 4 (they have no exits).
 %   If the window contains 'boundary' events (removed data) it is cut there and the pieces are averaged
 %   (pieces shorter than the Welch window are dropped).
 %
-% HOW THE PEAK IS FOUND (same idea as Task2Exp_spectral_analysis.m)
+% HOW THE PEAK IS FOUND (FOOOF, same settings as Task2_fooof.m; helper claude_fooof_peak.m)
 %   1. Welch spectrum of every channel (4 s Hamming windows, 50 % overlap), averaged over the channels of the ROI
-%      ROIs: MotorLeft, MotorRight and Motor (L+R) = the two together (mean of the 6 channels)
-%   2. straight line fitted to log10 power vs log10 frequency over 4-35 Hz (the 1/f background) and subtracted
-%   3. PEAK = highest LOCAL MAXIMUM of the corrected spectrum inside BETA (default 15-30 Hz);
-%      no local maximum in the range -> no peak (NaN)
+%      ROIs: MotorLeft, MotorRight and Motor (L+R) = the two together
+%   2. FOOOF on the RAW spectrum over 4-35 Hz (it fits the 1/f background and the peaks together)
+%   3. PEAK of a band (ALPHA 8-15, BETA 15-25 Hz) = highest FOOOF peak with its centre in the band; none -> NaN
 %
-% FIGURES
-%   1. corrected spectrum of each expert (whole task), dot = beta peak, black = mean; row 1 Task 1, row 2 Task 2
-%   2. beta peak frequency across repetitions: left Task 1 (6 scenarios), right Task 2 (20 repetitions);
-%      one coloured dot per expert, black = mean +/- SD; one row per ROI
-%   Printed: peak of every expert, n experts with a peak in each repetition.
+% FIGURES (Figures_Exp_BetaPeak/): spectra with the peaks (whole task, per expert), peak frequency across repetitions
+% PRINTED: peak of every expert, how many experts have a peak (per band, ROI, repetition).
 % =====================================================================================================
 
 clear; close all; clc;
-addpath(fileparts(mfilename('fullpath')));      % claude_figure_right.m
+addpath(fileparts(mfilename('fullpath')));      % claude_figure_right.m, claude_fooof_peak.m
 addpath '/home/acatalano/Matlab/eeglab_current/eeglab2026.0.0';
 eeglab nogui;
+addpath('/home/acatalano/Documents/MATLAB/fooof_mat/fooof_mat/');       % FOOOF (python wrapper)
 
 %% 1. SETTINGS -----------------------------------------------------------------------------------------
 USE_SAVED = true;         % true: use the saved spectra of a task if they exist (skips the slow part); false: recompute
 SAVE_FIGS = true;
-BETA      = [15 30];      % Hz, range where the peak is searched
-Alpha = [8 15];
-FIT       = [4 35];       % Hz, range of the 1/f fit and of the spectra shown
+bands(1).name = 'Alpha';  bands(1).rng = [8 15];
+bands(2).name = 'Beta';   bands(2).rng = [15 25];
+EDGE_HZ   = 1;            % a peak closer than this to a band edge is flagged '*'
+WEAK_PW   = 0.10;         % a peak lower than this (log10 above the aperiodic fit) is flagged '~'
+FIT       = [4 35];       % Hz, range fitted by FOOOF and of the spectra shown
 WIN_S     = 4;            % Welch window (s)
 
 subjects = {'IE01','IE02','IE03','IE04','IE05','IE07','IE08','IE09','IE10','IE11'};
@@ -47,88 +45,117 @@ if SAVE_FIGS && ~exist(fig_dir, 'dir'), mkdir(fig_dir); end
 ROI(1).name = 'MotorLeft';   ROI(1).ch = [15 20 10];     % same channels as Task12_Exp_ERD_ERS_ROI.m
 ROI(2).name = 'MotorRight';  ROI(2).ch = [13 19 9];
 ROI(3).name = 'Motor (L+R)'; ROI(3).ch = [ROI(1).ch ROI(2).ch];
-nS = numel(subjects);   nR = numel(ROI);
+nS = numel(subjects);   nR = numel(ROI);   nB = numel(bands);   rngM = reshape([bands.rng], 2, [])';
 
 tasks(1).name = 'Task 1';  tasks(1).nRep = 6;   tasks(1).repName = 'Scenario';    tasks(1).mode = 'matrix';  tasks(1).fallback = 'S%d';
 tasks(1).eegDir = '/home/acatalano/Desktop/Intuitive/IE_Task/IE_sixRep_behav/EEG';   tasks(1).eegSuffix = 'Task1_final.set';
-tasks(1).exitMat = [D 'ExitERS_Times_IE.mat'];   tasks(1).saved = [D 'Exp_T1_AlphaPeak_wholeRep.mat'];
+tasks(1).exitMat = [D 'ExitERS_Times_IE.mat'];   tasks(1).saved = {[D 'Exp_T1_AlphaPeak_wholeRep.mat'], [D 'Exp_T1_BetaPeak_wholeRep.mat']};
 tasks(1).excl = {'IE02', [1 4]; 'IE10', 6};
 
 tasks(2).name = 'Task 2';  tasks(2).nRep = 20;  tasks(2).repName = 'Repetition';  tasks(2).mode = 'events';  tasks(2).fallback = 'R%d';
 tasks(2).eegDir = '/home/acatalano/Desktop/Intuitive/IE_Task/Task2';                 tasks(2).eegSuffix = '_Task2_exitERS_events.set';
-tasks(2).exitMat = '';   tasks(2).saved = [D 'Exp_T2_AlphaPeak_wholeRep.mat'];
+tasks(2).exitMat = '';   tasks(2).saved = {[D 'Exp_T2_AlphaPeak_wholeRep.mat'], [D 'Exp_T2_BetaPeak_wholeRep.mat']};
 tasks(2).excl = {};
 
-%% 2. SPECTRUM OF EVERY REPETITION (slow part, saved), THEN THE PEAKS ----------------------------------
+%% 2. SPECTRUM OF EVERY REPETITION (slow part, saved: the RAW Welch spectra), THEN THE PEAKS ------------------------
 for k = 1:numel(tasks)
     T = tasks(k);
     fprintf('\n################ %s ################\n', T.name);
-    if USE_SAVED && exist(T.saved, 'file')
-        S = load(T.saved);   PSD = S.PSD;   dur = S.dur;   fAxis = S.fAxis;
-        fprintf('Loaded the saved spectra %s\n', T.saved);
+    sv = T.saved(cellfun(@(p) exist(p, 'file') > 0, T.saved));
+    if USE_SAVED && ~isempty(sv)
+        S = load(sv{1});   PSD = S.PSD;   dur = S.dur;   fAxis = S.fAxis;
+        fprintf('Loaded the saved spectra %s\n', sv{1});
     else
         [PSD, dur, fAxis] = compute_psd(T, subjects, ROI(1:2), WIN_S, FIT);
-        save(T.saved, 'PSD', 'dur', 'fAxis', 'subjects', 'Alpha', 'FIT');
-        fprintf('Saved %s\n', T.saved);
+        save(T.saved{1}, 'PSD', 'dur', 'fAxis', 'subjects', 'FIT');
+        fprintf('Saved %s\n', T.saved{1});
     end
-    % joint motor ROI: power of the 6 channels = mean of the two ROI spectra (3 channels each)
-    if size(PSD, 2) == 2, PSD(:, 3, :, :) = mean(PSD(:, 1:2, :, :), 2); end
+    if size(PSD, 2) == 2, PSD(:, 3, :, :) = mean(PSD(:, 1:2, :, :), 2); end     % joint motor ROI = mean of the two
 
-    [peakRep, peakAll, ampAll, corrAll] = compute_peaks(PSD, dur, fAxis, FIT, Alpha);
+    peakRep = nan(nS, nR, nB, T.nRep);   peakAll = nan(nS, nR, nB);   ampAll = nan(nS, nR, nB);   bwAll = nan(nS, nR, nB);   corrAll = nan(nS, nR, numel(fAxis));
+    for s = 1:nS
+        for r = 1:nR
+            for rep = 1:T.nRep
+                spec = squeeze(PSD(s, r, rep, :))';
+                if ~any(isnan(spec)), o = claude_fooof_peak(fAxis, spec, FIT, rngM);   peakRep(s, r, :, rep) = o.cf; end
+            end
+            w = dur(s, :);   ok = ~isnan(w);
+            if any(ok)
+                spec = squeeze(sum(PSD(s, r, ok, :) .* reshape(w(ok), 1, 1, [], 1), 3)) / sum(w(ok));
+                o = claude_fooof_peak(fAxis, spec(:)', FIT, rngM);
+                peakAll(s, r, :) = o.cf;   ampAll(s, r, :) = o.pw;   bwAll(s, r, :) = o.bw;
+                if ~isempty(o.freqs), corrAll(s, r, :) = interp1(o.freqs, o.resid, fAxis, 'linear', NaN); end
+            end
+        end
+        fprintf('  FOOOF done: %s\n', subjects{s});
+    end
     tasks(k).fAxis = fAxis;   tasks(k).peakRep = peakRep;   tasks(k).peakAll = peakAll;   tasks(k).ampAll = ampAll;   tasks(k).corrAll = corrAll;
 
-    fprintf('\n%s: Alpha PEAK OF EACH EXPERT, WHOLE TASK (range %d-%d Hz)\n', T.name, Alpha(1), Alpha(2));
-    fprintf('%-6s %16s %16s %16s %12s\n', 'expert', ROI(1).name, ROI(2).name, ROI(3).name, 'Right-Left');
-    for s = 1:nS, fprintf('%-6s %13.2f Hz %13.2f Hz %13.2f Hz %9.2f Hz\n', subjects{s}, peakAll(s, 1), peakAll(s, 2), peakAll(s, 3), peakAll(s, 2) - peakAll(s, 1)); end
-    fprintf('%-6s %13.2f Hz %13.2f Hz %13.2f Hz  (mean over experts with a peak; n = %d / %d / %d)\n', 'mean', mean(peakAll(:, 1), 'omitnan'), mean(peakAll(:, 2), 'omitnan'), mean(peakAll(:, 3), 'omitnan'), ...
-        nnz(~isnan(peakAll(:, 1))), nnz(~isnan(peakAll(:, 2))), nnz(~isnan(peakAll(:, 3))));
-    fprintf('\n%s: experts with a peak in each %s (of %d):\n%-12s', T.name, lower(T.repName), nS, T.repName); fprintf('%4d', 1:T.nRep); fprintf('\n');
-    for r = 1:nR, fprintf('%-12s', ROI(r).name); fprintf('%4d', squeeze(sum(~isnan(peakRep(:, r, :)), 1))); fprintf('\n'); end
+    for b = 1:nB
+        fprintf('\n%s: %s PEAK OF EACH EXPERT, WHOLE TASK (FOOOF, range %d-%d Hz; NaN = no peak found)\n', T.name, bands(b).name, bands(b).rng);
+        fprintf('each cell: centre Hz (h = height in log10 above the 1/f, w = width in Hz); * = within %g Hz of the band edge, ~ = height < %.2f\n', EDGE_HZ, WEAK_PW);
+        fprintf('%-6s %24s %24s %24s\n', 'expert', ROI(1).name, ROI(2).name, ROI(3).name);
+        for s = 1:nS
+            fprintf('%-6s', subjects{s});
+            for r = 1:nR, fprintf(' %24s', pk_str(peakAll(s, r, b), ampAll(s, r, b), bwAll(s, r, b), bands(b).rng, EDGE_HZ, WEAK_PW)); end
+            fprintf('\n');
+        end
+        solid = peakAll(:, :, b) > bands(b).rng(1) + EDGE_HZ & peakAll(:, :, b) < bands(b).rng(2) - EDGE_HZ & ampAll(:, :, b) >= WEAK_PW;
+        fprintf('%-6s mean of the peaks found: %.2f / %.2f / %.2f Hz;  peaks found: %d / %d / %d;  SOLID peaks (not edge, not weak): %d / %d / %d of %d experts\n', 'all', ...
+            mean(peakAll(:, 1, b), 'omitnan'), mean(peakAll(:, 2, b), 'omitnan'), mean(peakAll(:, 3, b), 'omitnan'), nnz(~isnan(peakAll(:, 1, b))), nnz(~isnan(peakAll(:, 2, b))), nnz(~isnan(peakAll(:, 3, b))), ...
+            nnz(solid(:, 1)), nnz(solid(:, 2)), nnz(solid(:, 3)), nS);
+        fprintf('       mean of the SOLID peaks only: %.2f / %.2f / %.2f Hz\n', mean(peakAll(solid(:, 1), 1, b), 'omitnan'), mean(peakAll(solid(:, 2), 2, b), 'omitnan'), mean(peakAll(solid(:, 3), 3, b), 'omitnan'));
+        fprintf('experts with a peak in each %s:\n%-18s', lower(T.repName), T.repName); fprintf('%4d', 1:T.nRep); fprintf('\n');
+        for r = 1:nR, fprintf('%-18s', [bands(b).name ' ' ROI(r).name]); fprintf('%4d', squeeze(sum(~isnan(peakRep(:, r, b, :)), 1))); fprintf('\n'); end
+    end
 end
 
-%% 3. FIGURE 1: SPECTRA WITH THE PEAKS -----------------------------------------------------------------
+%% 3. FIGURE 1: SPECTRA WITH THE PEAKS (one figure per band) -------------------------------------------------
 colS = lines(nS);
-f1 = claude_figure_right('Experts Alpha peak, whole task', 1800, 900);   set(f1, 'Color', 'w');
-for k = 1:numel(tasks)
-    for r = 1:nR
-        subplot(numel(tasks), nR, (k - 1) * nR + r);   hold on;
-        fA = tasks(k).fAxis;   h = gobjects(nS, 1);
-        for s = 1:nS
-            h(s) = plot(fA, squeeze(tasks(k).corrAll(s, r, :))', '-', 'Color', colS(s, :), 'LineWidth', 1.2);
-            if ~isnan(tasks(k).peakAll(s, r)), scatter(tasks(k).peakAll(s, r), tasks(k).ampAll(s, r), 45, colS(s, :), 'filled', 'MarkerEdgeColor', 'k'); end
-        end
-        plot(fA, squeeze(mean(tasks(k).corrAll(:, r, :), 1, 'omitnan'))', 'k-', 'LineWidth', 3);
-        xlim(FIT);   grid on;   box on;   xlabel('Frequency (Hz)');   ylabel('log10 power, 1/f removed');
-        yl = ylim;   yl = [min(yl(1), -0.3), yl(2)];   ylim(yl);
-        pt = patch([Alpha(1) Alpha(2) Alpha(2) Alpha(1)], [yl(1) yl(1) yl(2) yl(2)], [0.5 0.5 0.5], 'FaceAlpha', 0.10, 'EdgeColor', 'none');   % Alpha range
-        uistack(pt, 'bottom');
-        title(sprintf('%s - %s', tasks(k).name, ROI(r).name), 'FontSize', 11);
-        if k == 1 && r == nR, legend(h, subjects, 'Location', 'eastoutside'); end
-    end
-end
-sgtitle(sprintf('Experts: spectrum of the whole task (1/f removed). Dot = Alpha peak (%d-%d Hz), black = mean of experts, grey = Alpha range', Alpha(1), Alpha(2)));
-if SAVE_FIGS, print(f1, fullfile(fig_dir, 'Exp_Alpha_peak_spectra.png'), '-dpng', '-r110'); end
-
-%% 4. FIGURE 2: PEAK FREQUENCY ACROSS REPETITIONS ------------------------------------------------------
-f2 = claude_figure_right('Experts Alpha peak across repetitions', 1800, 950);   set(f2, 'Color', 'w');
-for r = 1:nR
+for b = 1:nB
+    f1 = claude_figure_right(['Experts ' bands(b).name ' peak, whole task'], 1800, 900);   set(f1, 'Color', 'w');
     for k = 1:numel(tasks)
-        if k == 1, subplot(nR, 4, (r - 1) * 4 + 1); else, subplot(nR, 4, (r - 1) * 4 + (2:4)); end
-        hold on;   nRep = tasks(k).nRep;   offs = linspace(-0.28, 0.28, nS);   h = gobjects(nS, 1);
-        for s = 1:nS
-            h(s) = scatter((1:nRep) + offs(s), squeeze(tasks(k).peakRep(s, r, :))', 30, colS(s, :), 'filled', 'MarkerFaceAlpha', 0.65, 'MarkerEdgeColor', 'none');
+        for r = 1:nR
+            subplot(numel(tasks), nR, (k - 1) * nR + r);   hold on;
+            fA = tasks(k).fAxis;   h = gobjects(nS, 1);
+            for s = 1:nS
+                h(s) = plot(fA, squeeze(tasks(k).corrAll(s, r, :))', '-', 'Color', colS(s, :), 'LineWidth', 1.2);
+                if ~isnan(tasks(k).peakAll(s, r, b)), scatter(tasks(k).peakAll(s, r, b), tasks(k).ampAll(s, r, b), 45, colS(s, :), 'filled', 'MarkerEdgeColor', 'k'); end
+            end
+            plot(fA, squeeze(mean(tasks(k).corrAll(:, r, :), 1, 'omitnan'))', 'k-', 'LineWidth', 3);
+            xlim(FIT);   grid on;   box on;   xlabel('Frequency (Hz)');   ylabel('log10 power minus FOOOF aperiodic fit');
+            yl = ylim;   yl = [min(yl(1), -0.3), yl(2)];   ylim(yl);
+            pt = patch(bands(b).rng([1 2 2 1]), yl([1 1 2 2]), [0.5 0.5 0.5], 'FaceAlpha', 0.10, 'EdgeColor', 'none');   uistack(pt, 'bottom');
+            title(sprintf('%s - %s', tasks(k).name, ROI(r).name), 'FontSize', 11);
+            if k == 1 && r == nR, legend(h, subjects, 'Location', 'eastoutside'); end
         end
-        Y = squeeze(tasks(k).peakRep(:, r, :));
-        errorbar(1:nRep, mean(Y, 1, 'omitnan'), std(Y, 0, 1, 'omitnan'), 'o', 'Color', 'k', 'MarkerFaceColor', 'k', 'MarkerSize', 6, 'LineWidth', 1.8, 'CapSize', 10);
-        xlim([0.4 nRep + 0.6]);   xticks(1:nRep);   ylim([Alpha(1) - 1, Alpha(2) + 1]);   grid on;   box on;
-        title(sprintf('%s - %s', tasks(k).name, ROI(r).name), 'FontSize', 11);
-        if k == 1, ylabel('Alpha peak frequency (Hz)'); end
-        if r == nR, xlabel(tasks(k).repName); end
-        if r == 1 && k == 2, legend(h, subjects, 'Location', 'eastoutside'); end
     end
+    sgtitle(sprintf('Experts: spectrum of the whole task minus the FOOOF aperiodic fit. Dot = %s peak (%d-%d Hz), black = mean, grey = band', bands(b).name, bands(b).rng));
+    if SAVE_FIGS, print(f1, fullfile(fig_dir, ['Exp_' bands(b).name '_peak_spectra.png']), '-dpng', '-r110'); end
 end
-sgtitle(sprintf('Experts: Alpha peak frequency (%d-%d Hz) of the whole repetition (dots = experts, black = mean +/- SD)', Alpha(1), Alpha(2)));
-if SAVE_FIGS, print(f2, fullfile(fig_dir, 'Exp_Alpha_peak_acrossReps.png'), '-dpng', '-r110'); end
+
+%% 4. FIGURE 2: PEAK FREQUENCY ACROSS REPETITIONS (one figure per band) ---------------------------------------
+for b = 1:nB
+    f2 = claude_figure_right(['Experts ' bands(b).name ' peak across repetitions'], 1800, 950);   set(f2, 'Color', 'w');
+    for r = 1:nR
+        for k = 1:numel(tasks)
+            if k == 1, subplot(nR, 4, (r - 1) * 4 + 1); else, subplot(nR, 4, (r - 1) * 4 + (2:4)); end
+            hold on;   nRep = tasks(k).nRep;   offs = linspace(-0.28, 0.28, nS);   h = gobjects(nS, 1);
+            for s = 1:nS
+                h(s) = scatter((1:nRep) + offs(s), squeeze(tasks(k).peakRep(s, r, b, :))', 30, colS(s, :), 'filled', 'MarkerFaceAlpha', 0.65, 'MarkerEdgeColor', 'none');
+            end
+            Y = squeeze(tasks(k).peakRep(:, r, b, :));
+            errorbar(1:nRep, mean(Y, 1, 'omitnan'), std(Y, 0, 1, 'omitnan'), 'o', 'Color', 'k', 'MarkerFaceColor', 'k', 'MarkerSize', 6, 'LineWidth', 1.8, 'CapSize', 10);
+            xlim([0.4 nRep + 0.6]);   xticks(1:nRep);   ylim(bands(b).rng + [-1 1]);   grid on;   box on;
+            title(sprintf('%s - %s', tasks(k).name, ROI(r).name), 'FontSize', 11);
+            if k == 1, ylabel([bands(b).name ' peak frequency (Hz)']); end
+            if r == nR, xlabel(tasks(k).repName); end
+            if r == 1 && k == 2, legend(h, subjects, 'Location', 'eastoutside'); end
+        end
+    end
+    sgtitle(sprintf('Experts: %s peak frequency (FOOOF, %d-%d Hz) of the whole repetition (dots = experts, black = mean +/- SD)', bands(b).name, bands(b).rng));
+    if SAVE_FIGS, print(f2, fullfile(fig_dir, ['Exp_' bands(b).name '_peak_acrossReps.png']), '-dpng', '-r110'); end
+end
 
 
 %% ---------------------------------------------------------------------
@@ -186,25 +213,6 @@ function [PSD, dur, fAxis] = compute_psd(T, subjects, ROI, WIN_S, FIT)
     end
 end
 
-function [peakRep, peakAll, ampAll, corrAll] = compute_peaks(PSD, dur, fAxis, FIT, Alpha)
-% peakRep(expert, roi, rep): peak of every repetition;  peakAll(expert, roi): peak of the whole task (repetitions weighted by duration)
-    [nS, nR, nRep, ~] = size(PSD);
-    peakRep = nan(nS, nR, nRep);   corrAll = nan(nS, nR, numel(fAxis));   peakAll = nan(nS, nR);   ampAll = nan(nS, nR);
-    for s = 1:nS
-        for r = 1:nR
-            for rep = 1:nRep
-                spec = squeeze(PSD(s, r, rep, :))';
-                if ~any(isnan(spec)), peakRep(s, r, rep) = Alpha_peak(fAxis, spec, FIT, Alpha); end
-            end
-            w = dur(s, :);   ok = ~isnan(w);
-            if any(ok)
-                spec = squeeze(sum(PSD(s, r, ok, :) .* reshape(w(ok), 1, 1, [], 1), 3)) / sum(w(ok));
-                [peakAll(s, r), ampAll(s, r), corrAll(s, r, :)] = Alpha_peak(fAxis, spec(:)', FIT, Alpha);
-            end
-        end
-    end
-end
-
 function [f, p, nSeg] = welch_psd(X, winN, nover, fs)
 % Welch power spectrum without toolboxes. X = samples x channels. Returns f (Hz), p = [freq x channels], nSeg = number of windows.
     w = 0.54 - 0.46 * cos(2 * pi * (0:winN - 1)' / (winN - 1));                  % Hamming window
@@ -220,17 +228,10 @@ function [f, p, nSeg] = welch_psd(X, winN, nover, fs)
     f = (0:floor(winN / 2))' * fs / winN;
 end
 
-function [cf, amp, corr] = Alpha_peak(f, spec, FIT, Alpha)
-% Removes the 1/f line (fit of log10 power vs log10 frequency over FIT) and returns the highest local maximum in Alpha.
-    f = f(:)';   spec = spec(:)';                                                % both as rows (a column and a row would expand into a matrix)
-    ok   = f >= FIT(1) & f <= FIT(2) & spec > 0;
-    pf   = polyfit(log10(f(ok)), log10(spec(ok)), 1);
-    corr = nan(size(f));   corr(ok) = log10(spec(ok)) - polyval(pf, log10(f(ok)));
-    cf = NaN;   amp = NaN;
-    idx = find(f >= Alpha(1) & f <= Alpha(2));
-    idx = idx(idx > 1 & idx < numel(f));
-    isMax = corr(idx) > corr(idx - 1) & corr(idx) >= corr(idx + 1);              % local maxima only
-    if any(isMax)
-        cand = idx(isMax);   [amp, k] = max(corr(cand));   cf = f(cand(k));
-    end
+function s = pk_str(cf, pw, bw, rng, EDGE_HZ, WEAK_PW)
+% text of one table cell: centre (h = height, w = width) and flags
+    if isnan(cf), s = 'NaN'; return; end
+    fl = '';   if cf <= rng(1) + EDGE_HZ || cf >= rng(2) - EDGE_HZ, fl = [fl '*']; end
+    if pw < WEAK_PW, fl = [fl '~']; end
+    s = sprintf('%.2f (h%.2f w%.1f)%s', cf, pw, bw, fl);
 end

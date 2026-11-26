@@ -584,6 +584,26 @@ for p = 1:NP
     paired_panel(FD(:,p), LD(:,p), sprintf('Pt%d execution time', p), 'seconds');
 end
 save_fig(SAVE_FIGS, fig_dir, 'fig6c_first_vs_last_point_times');
+%% 6d) duration of each point vs repetition (each point timed from the previous exit)
+S   = load(fullfile('/home/acatalano/Desktop/Intuitive/DataStructures', 'ExitERS_Times_IE_T2.mat'));
+ex  = S.ValidExitTimes;                                   % [10 x 20 x 4], seconds from the go marker
+prv = cat(3, zeros(size(ex,1), size(ex,2)), ex(:,:,1:3));
+dur = ex - prv;                                           % NaN if this exit or the previous one is missing
+dur(:,:,5) = ex(:,:,4);                                   % total = go -> exit Pt4
+lab = {'go \rightarrow Pt1','Pt1 \rightarrow Pt2','Pt2 \rightarrow Pt3','Pt3 \rightarrow Pt4','Total'};
+claude_figure_right('Duration of each point vs repetition', 1500, 330);
+for p = 1:5
+    subplot(1,5,p); hold on;
+    plot(1:20, dur(:,:,p)', '-', 'Color', [0.8 0.8 0.8]);                     % single experts
+    m = mean(dur(:,:,p), 1, 'omitnan');  sd = std(dur(:,:,p), 0, 1, 'omitnan');
+    errorbar(1:20, m, sd, 'k-o', 'MarkerFaceColor', 'k', 'MarkerSize', 4, 'LineWidth', 1.2);
+    n = sum(~isnan(dur(:,:,p)), 1);
+    title(sprintf('%s (n = %d–%d)', lab{p}, min(n), max(n)));
+    xlabel('Repetition'); if p == 1, ylabel('Duration (s)'); end
+    xlim([0.5 20.5]); grid on; box off;
+end
+save_fig(SAVE_FIGS, fig_dir, 'fig6d_point_duration_vs_repetition');
+
 
 
 %% ---------------------------------------------------------------------

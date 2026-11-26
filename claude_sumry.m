@@ -1,7 +1,7 @@
 D='/home/acatalano/Desktop/Intuitive/DataStructures/';
 E2=load('/home/acatalano/Desktop/Intuitive/IE_Task/Task2/ERD_ERS_Modulation_Task2_ROI_bands.mat');
-R=load([D 'ERD_ERS_Modulation_IR_ROI_bands.mat']);
-L3=load([D 'ERD_ERS_Modulation_IR_Last3.mat']);
+R=load([D 'ERD_ERS_Modulation_IR_ROI_bands_avgref.mat']);
+L3=load([D 'ERD_ERS_Modulation_IR_Last3_avgref.mat']);
 bn={E2.BANDS.name}; rn=E2.roi_names; fprintf('bands %s | rois %s\n',strjoin(bn,','),strjoin(rn,','));
 fn=@(x) fprintf('%s',x);
 met={'ERD','ERS','Mod'}; 

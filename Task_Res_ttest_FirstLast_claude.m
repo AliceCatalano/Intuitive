@@ -18,7 +18,8 @@ D = '/home/acatalano/Desktop/Intuitive/DataStructures/';
 REMOVE_OUTLIERS = true;   ROBUST_Z = 3.5;   LOO_Z = 3;
 INCLUDE_JOINED_MOTOR = false;   ALPHA = 0.05;   MIN_N = 3;   SAVE_FIGS = true;
 
-R = load([D 'ERD_ERS_Modulation_IR_ROI_bands.mat']);   % ERD_6d, ERS_6d, Mod_6d: [band x ROI x resident x scenario x rep x point]
+% ORIGINAL (common reference): R = load([D 'ERD_ERS_Modulation_IR_ROI_bands.mat']);
+R = load([D 'ERD_ERS_Modulation_IR_ROI_bands_avgref.mat']);   % ERD_6d, ERS_6d, Mod_6d: [band x ROI x resident x scenario x rep x point]
 T = load([D 'GraspERD_Times_IR.mat']);                 % RepStatus == 1: skip list
 P = load([D 'performanceStruct_IR_updated.mat']);      % performed trials
 subjects = R.subjects;   roi_names = R.roi_names;   BANDS = R.BANDS;

@@ -7,7 +7,7 @@ eeglab;
 
 % subjects = {'IE01','IE02','IE03','IE04','IE05', 'IE07', 'IE08', 'IE09', 'IE10','IE11'};
 base_path = '/home/acatalano/Desktop/Intuitive/IR_Task';
-subjects = {'IR02','IR04','IR05', 'IR06', 'IR07', 'IR08', 'IR09', 'IR10', 'IR11', 'IR12', 'IR13', 'IR14', 'IR16', 'IR17', 'IR18', 'IR19', 'IR21', 'IR22', 'IR23', 'IR24', 'IR25'};
+subjects = {'IR02','IR05', 'IR06', 'IR07', 'IR08', 'IR09', 'IR10', 'IR11', 'IR12', 'IR13', 'IR14', 'IR16', 'IR17', 'IR18', 'IR19', 'IR21', 'IR22', 'IR23', 'IR24', 'IR25'};
 images_path = '/home/acatalano/Desktop/Intuitive/IR_Task';
 
 bands = {'Theta', 'Alpha', 'Beta', 'Gamma'};

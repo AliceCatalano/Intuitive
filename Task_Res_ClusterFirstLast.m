@@ -1,120 +1,92 @@
 % Task_Res_ClusterFirstLast.m
-% RESIDENTS (IR): cluster-based permutation test, FIRST vs LAST repetition of
-% each subject, on the Grasp (ERD) and Exit (ERS) epochs.
-%
-% Input : <subj>_IR_graspERD_TFR.mat , <subj>_IR_exitERS_TFR.mat  (Task_Res_TFR.m)
-%         TFRhann.powspctrm = [240 slots x chan x freq x time], already normalised.
-%         Slot = (scenario-1)*40 + (rep-1)*4 + point.
-%
-% Definition of first / last repetition (per subject, per condition):
-%   a "repetition" = one (scenario, rep) pair = 4 suture points. It counts as
-%   usable if at least MIN_POINTS of its 4 points have data in that condition.
-%   FIRST = earliest usable repetition in task order (scenario, then rep)
-%   LAST  = latest usable repetition in task order
-%   Power of a repetition = mean over its usable points.
-%   Subjects with fewer than 2 usable repetitions are excluded.
-%   (set SCENARIO_FILTER to e.g. 1 to compare first vs last WITHIN one scenario)
-%
-% Test: per band, power averaged over the time window and frequency band, one
-% value per channel; paired (depsamplesT) montecarlo cluster test over channels.
-%   ERD window (grasp-locked): -0.5 to 1.0 s
-%   ERS window (exit-locked) : -2.0 to 0.0 s
-%
-% Output: Task_ClusterFirstLast_Residents.mat  (stats, which repetitions were used)
+% RESIDENTS: cluster-based permutation test, FIRST vs LAST repetition, grasp (ERD) and exit (ERS) epochs.
+% Same structure as Task_Res_ClusterBased.m (descriptives per subject -> grand average -> mean over time -> cluster test).
+% Input: IR_norm_grasp.mat / IR_norm_exit.mat (Task_Res_TFR_claude.m): one normalised TFR per resident, 240 slots each,
+%        slot = (scenario-1)*40 + (rep-1)*4 + point, empty slots are NaN.
+% FIRST = first repetition (scenario, rep) with data, LAST = last repetition with data; all its suture points are used.
 
-clear; close all; clc;
+clear, close all
 restoredefaultpath;
 addpath '/home/acatalano/Documents/MATLAB/fieldtrip-20250106';
 ft_defaults;
 addpath '/home/acatalano/Matlab/eeglab_current/eeglab2026.0.0';
 eeglab nogui;
 
-base_path  = '/home/acatalano/Desktop/Intuitive/IR_Task/ERDS';
-times_file = '/home/acatalano/Desktop/Intuitive/DataStructures/GraspERD_Times_IR.mat';
-out_file   = '/home/acatalano/Desktop/Intuitive/DataStructures/Task_ClusterFirstLast_Residents.mat';
-ref_file   = 'IR06_EO_downS_filt.set';
-ref_path   = '/home/acatalano/Desktop/Intuitive/';
+base_path = '/home/acatalano/Desktop/Intuitive/IR_Task/ERDS_avgref';
+out_file  = '/home/acatalano/Desktop/Intuitive/DataStructures/Task_ClusterFirstLast_Residents_avgref.mat';
+fig_dir   = '/home/acatalano/Desktop/Intuitive/DataStructures/Figures_IR_ClusterFirstLast_avgref';
+if ~exist(fig_dir, 'dir'), mkdir(fig_dir); end
 
-NUM_SCENARIOS = 6;  NUM_REPS = 10;  NUM_POINTS = 4;
-MIN_POINTS      = 2;        % usable points needed to accept a repetition
-SCENARIO_FILTER = [];       % [] = all scenarios; e.g. 1 = only scenario 1
-NUM_PERM        = 1000;
-TOL             = 1e-6;
-
-bands = {'Theta','Alpha','Beta','Gamma'};
+bands       = {'Theta', 'Alpha', 'Beta', 'Gamma'};
 freq_ranges = [4 8; 8 15; 15 25; 25 35];
 
-cond(1).name = 'graspERD'; cond(1).win = [-0.5 1.0];
-cond(2).name = 'exitERS';  cond(2).win = [-2.0 0.0];
+epochs     = {'grasp', 'exit'};
+latency    = [-0.5 1.0; -2.0 0.0];   % ERD window (grasp-locked) | ERS window (exit-locked)
 
-T        = load(times_file);
-subjects = T.subjects;
-nSubj    = numel(subjects);
+EEG = pop_loadset('filename', 'IR06_EO_downS_filt.set', 'filepath', '/home/acatalano/Desktop/Intuitive/');
+Clusterstatistic = struct();
 
-EEG_ref = pop_loadset('filename', ref_file, 'filepath', ref_path);
+for e = 1:length(epochs)
+    load(fullfile(base_path, ['IR_norm_' epochs{e} '.mat']));     % IR_norm_grasp / IR_norm_exit, subjects
+    TFR_allSubj = eval(['IR_norm_' epochs{e}]);
+    nSubj = length(TFR_allSubj);
+    elec  = TFR_allSubj{1}.elec;
 
-Results = struct();
+    first_rep = cell(nSubj,1);
+    last_rep  = cell(nSubj,1);
+    for i = 1:nSubj
+        tf_sngl_subj = TFR_allSubj{i};
 
-for c = 1:numel(cond)
-    fprintf('\n##### %s #####\n', cond(c).name);
-    bandVal = cell(1, numel(bands));            % each: [subj x chan] first / last
-    firstV  = cell(1, numel(bands));
-    lastV   = cell(1, numel(bands));
-    used    = nan(nSubj, 2);                    % repetition index (1..60) first/last
-    keep    = false(nSubj, 1);
-    ref     = [];                               % template freq structure
-
-    for s = 1:nSubj
-        f = fullfile(base_path, sprintf('%s_IR_%s_TFR.mat', subjects{s}, cond(c).name));
-        if ~exist(f, 'file'), warning('%s missing', f); continue; end
-        S = load(f); tf = S.TFRhann;
-        pw = tf.powspctrm;                      % [240 x chan x freq x time]
-        if isempty(ref), ref = tf; end
-
-        % usable points per repetition
-        hasData = squeeze(any(any(~isnan(pw), 2), [3 4]));   % [240 x 1]
-        hasData = hasData(:);
-        nPts    = sum(reshape(hasData, NUM_POINTS, NUM_REPS * NUM_SCENARIOS), 1);  % 1 x 60
-        repSc   = ceil((1:NUM_REPS*NUM_SCENARIOS) / NUM_REPS);
-        usable  = nPts >= MIN_POINTS;
-        if ~isempty(SCENARIO_FILTER), usable = usable & ismember(repSc, SCENARIO_FILTER); end
-        u = find(usable);
-        if numel(u) < 2
-            fprintf('  %s: <2 usable repetitions, excluded\n', subjects{s});
-            continue;
-        end
-        used(s,:) = [u(1) u(end)];
-        keep(s)   = true;
-
-        tIdx = find(tf.time >= cond(c).win(1)-TOL & tf.time <= cond(c).win(2)+TOL);
-        for b = 1:numel(bands)
-            fIdx = find(tf.freq >= freq_ranges(b,1)-TOL & tf.freq <= freq_ranges(b,2)+TOL);
-            for w = 1:2
-                r     = used(s,w);
-                slots = (r-1)*NUM_POINTS + (1:NUM_POINTS);
-                x     = pw(slots, :, fIdx, tIdx);                       % [4 x chan x f x t]
-                x     = squeeze(mean(mean(x, 4, 'omitnan'), 3, 'omitnan')); % [4 x chan]
-                x     = mean(x, 1, 'omitnan');                          % [1 x chan]
-                if w == 1, firstV{b}(s,:) = x; else, lastV{b}(s,:) = x; end
-            end
-        end
-        fprintf('  %s: first rep #%d (S%d R%d, %d pts) | last rep #%d (S%d R%d, %d pts)\n', ...
-            subjects{s}, used(s,1), repSc(used(s,1)), mod(used(s,1)-1,NUM_REPS)+1, nPts(used(s,1)), ...
-            used(s,2), repSc(used(s,2)), mod(used(s,2)-1,NUM_REPS)+1, nPts(used(s,2)));
-    end
-
-    nKeep = nnz(keep);
-    fprintf('Subjects included: %d / %d\n', nKeep, nSubj);
-
-    cfg_n = []; cfg_n.method = 'distance'; cfg_n.neighbourdist = 1;
-    for b = 1:numel(bands)
-        mk = @(M) struct('label', {ref.label}, 'freq', mean(freq_ranges(b,:)), ...
-            'dimord', 'subj_chan_freq', 'powspctrm', reshape(M(keep,:), nKeep, [], 1), 'elec', ref.elec);
-        Gf = mk(firstV{b});  Gl = mk(lastV{b});
+        % slots with data -> repetitions (4 slots each) with data
+        hasData = any(~isnan(tf_sngl_subj.powspctrm(:,:,:)), [2 3]);        % [240 x 1]
+        repData = find(any(reshape(hasData, 4, []), 1));                     % repetitions 1..60 with data
+        firstSlots = (repData(1)-1)*4 + (1:4);
+        lastSlots  = (repData(end)-1)*4 + (1:4);
+        firstSlots = firstSlots(hasData(firstSlots));                          % only the suture points with data
+        lastSlots  = lastSlots(hasData(lastSlots));
+        fprintf('%s: first = S%d R%d (%d points) | last = S%d R%d (%d points)\n', subjects{i}, ...
+            ceil(repData(1)/10), mod(repData(1)-1,10)+1, numel(firstSlots), ceil(repData(end)/10), mod(repData(end)-1,10)+1, numel(lastSlots));
 
         cfg = [];
+        cfg.variance      = 'no';
+        cfg.jackknife     = 'no';
+        cfg.keeptrials    = 'no';
+        cfg.channel       = 'all';
+        cfg.trials        = firstSlots;          % first repetition
+        cfg.frequency     = 'all';
+        cfg.latency       = latency(e,:);
+        first_rep{i} = ft_freqdescriptives(cfg, tf_sngl_subj);
+        cfg.trials        = lastSlots;           % last repetition
+        last_rep{i}  = ft_freqdescriptives(cfg, tf_sngl_subj);
+    end
+    clear TFR_allSubj tf_sngl_subj
+    eval(['clear IR_norm_' epochs{e}]);
+
+    cfg1 = [];
+    cfg1.keepindividual = 'yes';
+    GA_first = ft_freqgrandaverage(cfg1, first_rep{:});
+    GA_first.elec = elec;
+    GA_last  = ft_freqgrandaverage(cfg1, last_rep{:});
+    GA_last.elec = elec;
+
+    % mean over the time window
+    GA_first_notime = GA_first;
+    GA_last_notime  = GA_last;
+    GA_first_notime.dimord = 'subj_chan_freq';
+    GA_last_notime.dimord  = 'subj_chan_freq';
+    GA_first_notime.powspctrm = mean(GA_first.powspctrm, 4, 'omitnan');
+    GA_last_notime.powspctrm  = mean(GA_last.powspctrm, 4, 'omitnan');
+    GA_first_notime = rmfield(GA_first_notime, 'time');
+    GA_last_notime  = rmfield(GA_last_notime, 'time');
+
+    %% cluster-based permutation test, one per band
+    for b = 1:length(bands)
+        cfg = [];
+        cfg.channel          = 'EEG';
+        cfg.frequency        = [freq_ranges(b,1) freq_ranges(b,2)];
+        cfg.avgoverfreq      = 'yes';
         cfg.method           = 'montecarlo';
-        cfg.statistic        = 'ft_statfun_depsamplesT';
+        cfg.statistic        = 'ft_statfun_depsamplesT';  % paired t-test
         cfg.correctm         = 'cluster';
         cfg.clusteralpha     = 0.05;
         cfg.clusterstatistic = 'maxsum';
@@ -122,34 +94,46 @@ for c = 1:numel(cond)
         cfg.tail             = 0;
         cfg.clustertail      = 0;
         cfg.alpha            = 0.05;
-        cfg.numrandomization = NUM_PERM;
-        cfg.neighbours       = ft_prepare_neighbours(cfg_n, Gf);
-        cfg.design           = [1:nKeep 1:nKeep; ones(1,nKeep) 2*ones(1,nKeep)];
-        cfg.uvar = 1;  cfg.ivar = 2;
+        cfg.numrandomization = 1000;      % number of permutations
 
-        stat = ft_freqstatistics(cfg, Gl, Gf);          % last - first
-        Results.(cond(c).name).(bands{b}) = stat;
+        cfg_neighb = [];
+        cfg_neighb.method        = 'distance';
+        cfg_neighb.neighbourdist = 1;     % electrodes on a unit sphere: 5-10 neighbours per channel (mean 8)
+        cfg.neighbours       = ft_prepare_neighbours(cfg_neighb, GA_first_notime);
 
-        sigP = []; sigN = [];
-        if isfield(stat,'posclusters') && ~isempty(stat.posclusters)
-            for k = find([stat.posclusters.prob] < 0.05), sigP = [sigP; find(stat.posclusterslabelmat == k)]; end %#ok<AGROW>
+        subj = nSubj;                     % was fixed to 21 in Task_Res_ClusterBased.m (20 residents)
+        design = zeros(2,2*subj);
+        for i = 1:subj
+            design(1,i) = i;
         end
-        if isfield(stat,'negclusters') && ~isempty(stat.negclusters)
-            for k = find([stat.negclusters.prob] < 0.05), sigN = [sigN; find(stat.negclusterslabelmat == k)]; end %#ok<AGROW>
+        for i = 1:subj
+            design(1,subj+i) = i;
         end
-        el = [sigP(:); sigN(:)];
-        fprintf('  %s: %d significant channels (pos %d, neg %d)\n', bands{b}, numel(el), numel(sigP), numel(sigN));
+        design(2,1:subj)        = 1;
+        design(2,subj+1:2*subj) = 2;
 
-        figure('Name', sprintf('%s %s', cond(c).name, bands{b}));
-        topoplot(stat.stat, EEG_ref.chanlocs, 'gridscale', 100, 'headrad', 0.61, ...
-            'electrodes', 'off', 'maplimits', [-5 5], 'emarker2', {el, 'o', [0 0 0], 5, 1});
+        cfg.design   = design;
+        cfg.uvar     = 1;
+        cfg.ivar     = 2;
+
+        stat = ft_freqstatistics(cfg, GA_last_notime, GA_first_notime);   % last - first
+        Clusterstatistic.(epochs{e}).(bands{b}) = stat;
+
+        % channels of the SIGNIFICANT clusters only (p < 0.05)
+        el = [];
+        if isfield(stat, 'posclusters') && ~isempty(stat.posclusters)
+            for k = find([stat.posclusters.prob] < cfg.alpha), el = [el; find(stat.posclusterslabelmat == k)]; end
+        end
+        if isfield(stat, 'negclusters') && ~isempty(stat.negclusters)
+            for k = find([stat.negclusters.prob] < cfg.alpha), el = [el; find(stat.negclusterslabelmat == k)]; end
+        end
+
+        fig = figure;
+        topoplot(stat.stat, EEG.chanlocs, 'gridscale', 100, 'headrad', 0.61, 'electrodes', 'off', 'maplimits', [-5 5], 'emarker2', {el, 'o', [0 0 0], 5, 1});
         colorbar;
-        title(sprintf('%s | %s (%d-%d Hz) | last vs first (t-values), N=%d', ...
-            cond(c).name, bands{b}, freq_ranges(b,1), freq_ranges(b,2), nKeep));
+        title(sprintf('%s | %s band (%d-%d Hz) | last vs first, N = %d', epochs{e}, bands{b}, freq_ranges(b,1), freq_ranges(b,2), subj));
+        exportgraphics(fig, fullfile(fig_dir, sprintf('IR_ClusterFirstLast_%s_%s_avgref.png', epochs{e}, bands{b})), 'Resolution', 300);
     end
-    Results.(cond(c).name).usedReps = used;
-    Results.(cond(c).name).included = subjects(keep);
 end
 
-save(out_file, 'Results', 'subjects', 'bands', 'freq_ranges', 'cond', 'MIN_POINTS', 'SCENARIO_FILTER');
-fprintf('\nSaved: %s\n', out_file);
+save(out_file, 'Clusterstatistic', 'subjects', 'bands', 'freq_ranges', 'latency');

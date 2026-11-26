@@ -28,7 +28,8 @@ if SAVE_FIGS && ~exist(OUT, 'dir'), mkdir(OUT); end
 
 E2 = load('/home/acatalano/Desktop/Intuitive/IE_Task/Task2/ERD_ERS_Modulation_Task2_ROI_bands.mat');          % experts Task 2
 T1 = load('/home/acatalano/Desktop/Intuitive/IE_Task/IE_sixRep_behav/EEG/ERD_ERS_Modulation_Task1_ROI_bands.mat'); % experts Task 1
-R  = load([D 'ERD_ERS_Modulation_IR_ROI_bands.mat']);                                                          % residents
+% ORIGINAL (common reference): R  = load([D 'ERD_ERS_Modulation_IR_ROI_bands.mat']);
+R  = load([D 'ERD_ERS_Modulation_IR_ROI_bands_avgref.mat']);                                                          % residents
 
 cE = [0.15 0.35 0.7];   cR = [0.85 0.4 0.1];                 % experts / residents (as in claude_figs.m)
 area_names = {'MotorLeft', 'MotorRight', 'Motor (left+right mean)'};

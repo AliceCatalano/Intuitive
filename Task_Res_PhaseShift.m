@@ -35,9 +35,12 @@ restoredefaultpath;
 addpath '/home/acatalano/Documents/MATLAB/fieldtrip-20250106'; ft_defaults;
 addpath '/home/acatalano/Matlab/eeglab_current/eeglab2026.0.0'; eeglab nogui;
 
-base_path  = '/home/acatalano/Desktop/Intuitive/IR_Task/ERDS';
+% ORIGINAL (common reference): base_path  = '/home/acatalano/Desktop/Intuitive/IR_Task/ERDS';
+base_path  = '/home/acatalano/Desktop/Intuitive/IR_Task/ERDS_avgref';   % filtered + average reference
 times_file = '/home/acatalano/Desktop/Intuitive/DataStructures/GraspERD_Times_IR.mat';
-out_file   = '/home/acatalano/Desktop/Intuitive/DataStructures/PhaseAnalysis_Residents.mat';
+% ORIGINAL: out_file   = '/home/acatalano/Desktop/Intuitive/DataStructures/PhaseAnalysis_Residents.mat';
+out_file   = '/home/acatalano/Desktop/Intuitive/DataStructures/PhaseAnalysis_Residents_avgref.mat';
+fig_dir    = '/home/acatalano/Desktop/Intuitive/DataStructures/Figures_IR_PhaseShift_avgref';
 EEG_ref    = pop_loadset('filename','IR06_EO_downS_filt.set','filepath','/home/acatalano/Desktop/Intuitive/');
 
 NUM_SC = 6; NUM_REPS = 10; NUM_PTS = 4; NUM_SLOTS = NUM_SC*NUM_REPS*NUM_PTS;
@@ -212,6 +215,13 @@ for b = 1:numel(bands)
             fprintf('%-8s %-12s %-12s %5d %9.2f %8.3f%s\n', bands(b).name, roi_names{r}, cond(c).name, nnz(ok), mean(rho(ok)), p, ternary(p<0.05,' *',''));
         end
     end
+end
+
+% save every figure as PNG (file name = figure name)
+if ~exist(fig_dir, 'dir'), mkdir(fig_dir); end
+figs = findobj('Type', 'figure');
+for i = 1:numel(figs)
+    exportgraphics(figs(i), fullfile(fig_dir, ['IR_Phase_' regexprep(figs(i).Name, '\W+', '_') '_avgref.png']), 'Resolution', 200);
 end
 
 function o = PhAcirc(x)   % circular mean of an angle array (rad)

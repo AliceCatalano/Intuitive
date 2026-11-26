@@ -19,10 +19,13 @@ addpath '/home/acatalano/Documents/MATLAB/fieldtrip-20250106'; ft_defaults;
 addpath('/home/acatalano/Documents/MATLAB/fooof_mat/fooof_mat/');
 addpath '/home/acatalano/Matlab/eeglab_current/eeglab2026.0.0'; eeglab nogui;
 
-base_path  = '/home/acatalano/Desktop/Intuitive/IR_Task/ERDS';
+% ORIGINAL (common reference, before the average reference): base_path  = '/home/acatalano/Desktop/Intuitive/IR_Task/ERDS';
+base_path  = '/home/acatalano/Desktop/Intuitive/IR_Task/ERDS_avgref';   % NEW: filtered + average reference (same as the experts)
 times_file = '/home/acatalano/Desktop/Intuitive/DataStructures/GraspERD_Times_IR.mat';
-ps_file    = '/home/acatalano/Desktop/VIRTUES/ps_ge75_long.csv';
-out_file   = '/home/acatalano/Desktop/Intuitive/DataStructures/Task_FOOOF_Residents.mat';
+% ORIGINAL (moved to the _to_delete folder): ps_file    = '/home/acatalano/Desktop/VIRTUES/ps_ge75_long.csv';
+ps_file    = '/home/acatalano/Desktop/Intuitive/DataStructures/ps_ge75_long.csv';   % copy kept in the project
+% ORIGINAL: out_file   = '/home/acatalano/Desktop/Intuitive/DataStructures/Task_FOOOF_Residents.mat';
+out_file   = '/home/acatalano/Desktop/Intuitive/DataStructures/Task_FOOOF_Residents_avgref.mat';   % NEW (the old file is not overwritten)
 EEG_ref    = pop_loadset('filename','IR06_EO_downS_filt.set','filepath','/home/acatalano/Desktop/Intuitive/');
 
 NUM_SC = 6; NUM_REPS = 10; NUM_PTS = 4; NUM_SLOTS = NUM_SC*NUM_REPS*NUM_PTS;

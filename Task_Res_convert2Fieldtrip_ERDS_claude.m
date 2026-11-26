@@ -22,7 +22,8 @@ ft_defaults;
 addpath '/home/acatalano/Matlab/eeglab_current/eeglab2026.0.0';
 eeglab nogui;
 
-base_path  = '/home/acatalano/Desktop/Intuitive/IR_Task/ERDS';
+% ORIGINAL (common reference, before the average reference): base_path  = '/home/acatalano/Desktop/Intuitive/IR_Task/ERDS';
+base_path  = '/home/acatalano/Desktop/Intuitive/IR_Task/ERDS_avgref';   % NEW: filtered + average reference
 times_file = '/home/acatalano/Desktop/Intuitive/DataStructures/GraspERD_Times_IR.mat';
 
 NUM_SCENARIOS = 6;

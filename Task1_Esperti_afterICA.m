@@ -4,10 +4,12 @@ eeglab;
 
 % Load initial dataset
 subject = input('Enter the subject name (e.g., IE#): ', 's');
-datasetFilename = [subject '_Task1_ICA.set'];
-baseFolderPath = '/home/acatalano/Desktop/Intuitive/IE_Task/IE_sixRep_behav/EEG';
-datasetPath = baseFolderPath;
-EEG = pop_loadset('filename', datasetFilename, 'filepath', datasetPath);
+%datasetFilename = [subject '_Task1_ICA.set'];
+datasetFilename = [subject '_ICA.set'];
+%baseFolderPath = '/home/acatalano/Desktop/Intuitive/IE_Task/IE_sixRep_behav/EEG';
+baseFolderPath = '/home/acatalano/Desktop/Intuitive/IR_Task/EEG_alice/EEG_alice';
+datasetPath = '/home/acatalano/Desktop/Intuitive/IR_Task';
+EEG = pop_loadset('filename', datasetFilename, 'filepath', baseFolderPath);
 
 % Store the loaded dataset
 [ALLEEG, EEG, CURRENTSET] = eeg_store(ALLEEG, EEG, 0);
@@ -19,7 +21,7 @@ compToRemove = input('Enter the components to remove (e.g., [1 6 13]): ');
 EEG = pop_subcomp( EEG, compToRemove, 0);
 EEG = eeg_checkset( EEG );
 EEG = pop_reref( EEG, []);
-EEG = pop_saveset( EEG, 'filename', [ subject, '_rejComp.set'], 'filepath', datasetPath);
+EEG = pop_saveset( EEG, 'filename', [ subject, '_rejComp.set'], 'filepath', baseFolderPath);
 eeglab redraw;
 % Plot the spectrum and ask for user validation
 figure; pop_spectopo(EEG, 1, [0 870448.0068], 'EEG', 'freq', [3 6 12 20], 'freqrange',[2 40], 'electrodes','off');
@@ -40,4 +42,4 @@ eeglab redraw;
 % Interpolate
 channelsToInterpolate = input('Enter channels to interpolate (e.g., [1 2 5]): ');
 EEG = pop_interp(EEG, EEG_full.chanlocs(channelsToInterpolate), 'spherical');
-EEG = pop_saveset( EEG, 'filename', [subject, 'Task1_final.set'], 'filepath', datasetPath);
+EEG = pop_saveset( EEG, 'filename', [subject, '_afterICA.set'], 'filepath', datasetPath);

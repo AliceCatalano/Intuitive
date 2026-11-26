@@ -43,10 +43,12 @@ restoredefaultpath;
 addpath '/home/acatalano/Matlab/eeglab_current/eeglab2026.0.0';
 eeglab nogui;
 
-base_path  = '/home/acatalano/Desktop/Intuitive/IR_Task/ERDS';
+% ORIGINAL (common reference, before the average reference): base_path  = '/home/acatalano/Desktop/Intuitive/IR_Task/ERDS';
+base_path  = '/home/acatalano/Desktop/Intuitive/IR_Task/ERDS_avgref';   % NEW: filtered + average reference (input afterICA and output)
 times_file = '/home/acatalano/Desktop/Intuitive/DataStructures/GraspERD_Times_IR.mat';
 exit_file  = '/home/acatalano/Desktop/Intuitive/DataStructures/ExitERS_Times_IR.mat';
-log_file   = '/home/acatalano/Desktop/Intuitive/DataStructures/EventInsertion_Log_IR.mat';
+% ORIGINAL (common reference, before the average reference): log_file   = '/home/acatalano/Desktop/Intuitive/DataStructures/EventInsertion_Log_IR.mat';
+log_file   = '/home/acatalano/Desktop/Intuitive/DataStructures/EventInsertion_Log_IR_avgref.mat';   % NEW: filtered + average reference
 
 EEG_IN_SUFFIX    = '_afterICA.set';              % input  : <subj><suffix>
 GRASP_OUT_SUFFIX = '_IR_graspERD_events.set';    % output : grasp events only
@@ -122,8 +124,7 @@ for s = 1:numel(subjects)
             msAll = [EEG.event(strcmp(types, sprintf('MS%d_%d', sc, tr))).latency];
             meAll = [EEG.event(strcmp(types, sprintf('ME%d_%d', sc, tr))).latency];
             if isempty(msAll) || isempty(meAll)
-                LOG(end+1,:) = {subject, sc, tr, sprintf('no %s%s marker', ...
-                    tern(isempty(msAll),'MS ',''), tern(isempty(meAll),'ME',''))}; %#ok<SAGROW>
+                LOG(end+1,:) = {subject, sc, tr, sprintf('no %s%s marker', tern(isempty(msAll),'MS ',''), tern(isempty(meAll),'ME',''))}; %#ok<SAGROW>
                 fprintf('  Sc%d Rep%02d: MS/ME missing -> no events\n', sc, tr);
                 continue;
             end

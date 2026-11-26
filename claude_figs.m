@@ -8,9 +8,12 @@ OUT=[D 'Figures_claude_figs/'];          % PNGs are saved here (created if missi
 if ~exist(OUT,'dir'), mkdir(OUT); end
 E1 = load('/home/acatalano/Desktop/Intuitive/IE_Task/Modulation_Experts.mat');
 E2=load('/home/acatalano/Desktop/Intuitive/IE_Task/Task2/ERD_ERS_Modulation_Task2_ROI_bands.mat');
-R=load([D 'ERD_ERS_Modulation_IR_ROI_bands.mat']);
-F=load([D 'Task_FOOOF_Residents.mat']);
-C=load([D 'Task_ClusterFirstLast_Residents.mat']);
+% ORIGINAL: R=load([D 'ERD_ERS_Modulation_IR_ROI_bands.mat']);
+R=load([D 'ERD_ERS_Modulation_IR_ROI_bands_avgref.mat']);
+% ORIGINAL: F=load([D 'Task_FOOOF_Residents.mat']);
+F=load([D 'Task_FOOOF_Residents_avgref.mat']);
+% ORIGINAL: C=load([D 'Task_ClusterFirstLast_Residents.mat']);
+C=load([D 'Task_ClusterFirstLast_Residents_avgref.mat']);      % Clusterstatistic.(grasp|exit).(Theta|Alpha|Beta|Gamma)
 
 rn=E2.roi_names; cE=[0.15 0.35 0.7]; cR=[0.85 0.4 0.1];
 NS=6;NR=10;NP=4;
@@ -42,7 +45,8 @@ sv(f,  'fig1_groups.png');
 %% Fig 1b: same as Fig 1, but residents ONLY on the 3 successful repetitions of each scenario
 % (ERD_ERS_Modulation_IR_Last3.mat: [band x ROI x subject x scenario], mean over the 3 repetitions x 4 points)
 % Each resident = mean over the scenarios for which he/she has a value. Experts: all repetitions (as Fig 1).
-L3 = load([D 'ERD_ERS_Modulation_IR_Last3.mat']);
+% ORIGINAL: L3 = load([D 'ERD_ERS_Modulation_IR_Last3.mat']);
+L3 = load([D 'ERD_ERS_Modulation_IR_Last3_avgref.mat']);
 f=mk();
 for b=1:2
     for m=1:3
@@ -169,12 +173,14 @@ sv(f,'fig4_peakhist.png'); close(f);
 
 %% Fig 5: cluster topographies (last - first), residents
 EEG=pop_loadset('filename','IR06_EO_downS_filt.set','filepath','/home/acatalano/Desktop/Intuitive/');
-f=figure('Visible','off','Position',[50 50 1500 480],'Color','w');
-cl={{'graspERD','Alpha'},{'exitERS','Theta'},{'exitERS','Alpha'}};
-for i=1:3
-  s=C.Results.(cl{i}{1}).(cl{i}{2}); el_=[];
-  for k=find([s.negclusters.prob]<0.05), el_=[el_; find(s.negclusterslabelmat==k)]; end
-  subplot(1,3,i); topoplot(s.stat,EEG.chanlocs,'gridscale',100,'headrad',0.61,'electrodes','off','maplimits',[-5 5],'emarker2',{el_,'o',[0 0 0],5,1});
+f=figure('Visible','off','Position',[50 50 1800 800],'Color','w');
+% ORIGINAL: only {'graspERD','Alpha'},{'exitERS','Theta'},{'exitERS','Alpha'} (significant in the old analysis), negative clusters only
+cl={}; for ep={'grasp','exit'}, for bd=C.bands, cl{end+1}={ep{1},bd{1}}; end, end %#ok<SAGROW>
+for i=1:numel(cl)
+  s=C.Clusterstatistic.(cl{i}{1}).(cl{i}{2}); el_=[];
+  if isfield(s,'posclusters') && ~isempty(s.posclusters), for k=find([s.posclusters.prob]<0.05), el_=[el_; find(s.posclusterslabelmat==k)]; end, end
+  if isfield(s,'negclusters') && ~isempty(s.negclusters), for k=find([s.negclusters.prob]<0.05), el_=[el_; find(s.negclusterslabelmat==k)]; end, end
+  subplot(2,numel(C.bands),i); topoplot(s.stat,EEG.chanlocs,'gridscale',100,'headrad',0.61,'electrodes','off','maplimits',[-5 5],'emarker2',{el_,'o',[0 0 0],5,1});
   colorbar; title(sprintf('%s | %s',cl{i}{1},cl{i}{2}));
 end
 sgtitle('Residents: t-map of last minus first repetition (black dots = channels of the significant cluster)');

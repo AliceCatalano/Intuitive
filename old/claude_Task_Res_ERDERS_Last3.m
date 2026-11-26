@@ -22,7 +22,7 @@
 clear; close all; clc;
 addpath(fileparts(mfilename('fullpath')));   % so claude_figure_right.m is found
 
-erd_file = '/home/acatalano/Desktop/Intuitive/DataStructures/ERD_ERS_Modulation_IR_ROI_bands.mat';
+erd_file = '/home/acatalano/Desktop/Intuitive/DataStructures/ERD_ERS_Modulation_IR_ROI_bands_filteredMerged.mat';
 csv_file = '/home/acatalano/Desktop/Intuitive/last3_successful_residents.csv';
 out_file = '/home/acatalano/Desktop/Intuitive/DataStructures/ERD_ERS_Modulation_IR_Last3.mat';
 fig_dir  = '/home/acatalano/Desktop/Intuitive/DataStructures/Figures_IR_ERDERS_Last3';
@@ -171,7 +171,7 @@ function plot_last3(ERD, ERS, Mod, ERDp, ERSp, Modp, roi_names, BANDS, saveFigs,
             sgtitle(sprintf('Residents, 3 successful repetitions - %s (%d-%d Hz): %s', ...
                 BANDS(b).name, BANDS(b).fmin, BANDS(b).fmax, vname{view}), 'FontSize', 13);
             if saveFigs
-                saveas(fig, fullfile(figDir, sprintf('IR_Last3_%s_%d.png', BANDS(b).name, view)));
+                saveas(fig, fullfile(figDir, sprintf('IR_Last3_%s_%d_newFilt.png', BANDS(b).name, view)));
             end
         end
     end

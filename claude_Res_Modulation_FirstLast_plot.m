@@ -17,6 +17,9 @@
 %   5. for every band / ROI / scenario collect the first and last value, count n, plot
 %   6. print the n table and who is missing and why; save the plotted numbers to a CSV
 %
+% THIS ONE SCRIPT REPLACES the older claude_Task_Res_FirstLast*.m scripts: METRIC (ERD/ERS/modulation), paired tests, rmANOVA and
+% mixed model on the same trials. Set METRIC and ROI_FILE below and run once per metric.
+%
 % PART B (sections 7-11, same file): first UNSUCCESSFUL vs first SUCCESSFUL trial, see the header of section 7.
 %
 % A trial with no modulation value (e.g. no needle data) is NOT replaced by another trial:
@@ -33,20 +36,27 @@ REMOVE_OUTLIERS = true;
 ROBUST_Z  = 3.5;      % outlier rule 1: median/MAD z-score above this
 LOO_Z     = 3;        % outlier rule 2: z-score vs the mean of all OTHER residents above this
 SAVE_FIGS = true;
+METRIC    = 'Modulation';   % what is analysed everywhere in this script: 'Modulation' | 'ERS' | 'ERD'
+% ROI_FILE  = 'ERD_ERS_Modulation_IR_ROI_bands_filteredMerged.mat';   % previous: 6 residents band-passed after ICA, common reference
+% previous (old data for the residents not re-processed): ROI_FILE  = 'ERD_ERS_Modulation_IR_ROI_bands_avgrefMerged.mat';
+ROI_FILE  = 'ERD_ERS_Modulation_IR_ROI_bands_avgref.mat';   % data file; for the filter sensitivity test use 'ERD_ERS_Modulation_IR_ROI_bands_filteredMerged.mat'
 CUTOFF    = 75;       % PART B: score (%) that defines a successful trial
 CSV_FILE  = '/home/acatalano/Desktop/Intuitive/last3_successful_residents.csv';   % PART B: the 3 successful trials
 FALLBACK_UNSUCC = true;   FALLBACK_SUCC = true;   % PART B: use the next trial with a value if the chosen one has none
 FALLBACK  = true;     % true: first/last = earliest/latest repetition WITH a value; false: first/last performed rep only
 
 %% 1. LOAD ---------------------------------------------------------------------------------------------
-R = load([D 'ERD_ERS_Modulation_IR_ROI_bands.mat']);   % Mod_6d: [band x ROI x resident x scenario x rep x point]
+R = load([D ROI_FILE]);   % Mod_6d: [band x ROI x resident x scenario x rep x point]
 T = load([D 'GraspERD_Times_IR.mat']);                 % T.RepStatus(resident, scenario, rep) == 1 -> skip list
 P = load([D 'performanceStruct_IR_updated.mat']);      % which trials each resident performed
 
 subjects  = R.subjects;      % resident names
 roi_names = R.roi_names;     % the ROIs
 BANDS     = R.BANDS;         % BANDS(b).name = beta / alpha
-Mod6      = R.Mod_6d;
+fieldMap  = struct('Modulation', 'Mod_6d', 'ERS', 'ERS_6d', 'ERD', 'ERD_6d');
+Mod6      = R.(fieldMap.(METRIC));      % [band x ROI x resident x scenario x rep x point] of the chosen metric
+mtag      = lower(METRIC);              % used in the names of the figures
+dtag      = '';   if contains(ROI_FILE, 'avgref'), dtag = '_avgref'; elseif contains(ROI_FILE, 'filtered'), dtag = '_filtered'; end   % data source, added to the figure names
 
 [nB, nROI, nS, NS, NRep, ~] = size(Mod6);
 fprintf('Loaded: %d bands, %d ROIs, %d residents, %d scenarios, %d repetitions (max)\n', nB, nROI, nS, NS, NRep);
@@ -116,7 +126,7 @@ end
 % last trial). A resident is an outlier if it is far from the others (robust z > 3.5 OR leave-one-out z > 3).
 % The outlier is removed from ALL the plots of that band.
 isOut = false(nS, nB);
-fprintf('\nOUTLIERS (rule: robust z > %.1f or leave-one-out z > %.1f on the resident''s mean modulation)\n', ROBUST_Z, LOO_Z);
+fprintf('\nOUTLIERS (rule: robust z > %.1f or leave-one-out z > %.1f on the resident''s mean %s)\n', ROBUST_Z, LOO_Z, mtag);
 for b = 1:nB
     resMean = nan(nS, 1);
     for s = 1:nS
@@ -134,7 +144,7 @@ for b = 1:nB
     if any(isOut(:, b))
         fprintf('  %-6s -> removed: %s\n', BANDS(b).name, strjoin(subjects(isOut(:, b)), ', '));
         for s = find(isOut(:, b))'
-            fprintf('           %s mean modulation = %.3f   (all residents: median %.3f)\n', subjects{s}, resMean(s), median(resMean, 'omitnan'));
+            fprintf('           %s mean %s = %.3f   (all residents: median %.3f)\n', subjects{s}, mtag, resMean(s), median(resMean, 'omitnan'));
         end
     else
         fprintf('  %-6s -> no outliers\n', BANDS(b).name);
@@ -151,7 +161,7 @@ panelL   = cell(nB, nROI, NS);   % last-trial values
 if SAVE_FIGS && ~exist([D 'Figures_IR_FirstLast'], 'dir'), mkdir([D 'Figures_IR_FirstLast']); end
 
 for b = 1:nB
-    f = claude_figure_right(sprintf('Residents modulation %s', BANDS(b).name), 1700, 260*nROI + 60);
+    f = claude_figure_right(sprintf('Residents %s %s', mtag, BANDS(b).name), 1700, 260*nROI + 60);
     set(f, 'Color', 'w');
 
     for r = 1:nROI
@@ -192,7 +202,7 @@ for b = 1:nB
             end
             xlim([0.5 2.5]);   xticks([1 2]);   xticklabels({'First', 'Last'});   box on;   grid on;
             title(sprintf('Sc%d  (n = %d)', sc, n), 'FontSize', 10);
-            if sc == 1, ylabel(sprintf('%s\nmodulation', roi_names{r})); end
+            if sc == 1, ylabel(sprintf('%s\n%s', roi_names{r}, mtag)); end
         end
 
         % same y-limits across the 6 scenarios of this ROI
@@ -201,8 +211,8 @@ for b = 1:nB
             for sc = 1:NS, set(subplot(nROI, NS, (r - 1) * NS + sc), 'YLim', [min(rowVals) - pad, max(rowVals) + pad]); end
         end
     end
-    sgtitle(sprintf('Residents - %s modulation: first vs last performed trial (squares = mean +/- SD, dots/lines = single residents)', BANDS(b).name));
-    if SAVE_FIGS, print(f, [D 'Figures_IR_FirstLast/IR_modulation_firstlast_' BANDS(b).name '.png'], '-dpng', '-r110'); end
+    sgtitle(sprintf('Residents - %s %s: first vs last performed trial (squares = mean +/- SD, dots/lines = single residents)', BANDS(b).name, mtag));
+    if SAVE_FIGS, print(f, [D 'Figures_IR_FirstLast/IR_' mtag dtag '_firstlast_' BANDS(b).name '.png'], '-dpng', '-r110'); end
 end
 
 %% 5b. SUMMARY PLOT: scenarios on the x axis, first and last mean +/- SD side by side ------------------
@@ -210,7 +220,7 @@ end
 % Light dots = single residents (same n as the panels above). Number of residents per scenario: see the n table below.
 
 for b = 1:nB
-    f2 = claude_figure_right(sprintf('Residents modulation summary %s', BANDS(b).name), 1100, 800);   set(f2, 'Color', 'w');
+    f2 = claude_figure_right(sprintf('Residents %s summary %s', mtag, BANDS(b).name), 1100, 800);   set(f2, 'Color', 'w');
     for r = 1:nROI
         subplot(2, 2, r);   hold on;
         mF = nan(1, NS);  sF = mF;  mL = mF;  sL = mF;
@@ -224,12 +234,12 @@ for b = 1:nB
         h1 = errorbar((1:NS) - 0.18, mF, sF, 'o-', 'Color', colFirst, 'MarkerFaceColor', colFirst, 'LineWidth', 1.8, 'CapSize', 8);
         h2 = errorbar((1:NS) + 0.18, mL, sL, 's-', 'Color', colLast,  'MarkerFaceColor', colLast,  'LineWidth', 1.8, 'CapSize', 8);
         xlim([0.5 NS + 0.5]);  xticks(1:NS);  grid on;  box on;
-        xlabel('Scenario');  ylabel('Modulation');
+        xlabel('Scenario');  ylabel(METRIC);
         title(sprintf('%s   (n per scenario: %s)', roi_names{r}, strjoin(arrayfun(@num2str, squeeze(nTable(b, r, :))', 'UniformOutput', false), ',')), 'FontSize', 10);
         if r == 1, legend([h1 h2], {'First trial', 'Last trial'}, 'Location', 'best'); end
     end
-    sgtitle(sprintf('Residents - %s modulation: first vs last trial per scenario (mean +/- SD)', BANDS(b).name));
-    if SAVE_FIGS, print(f2, [D 'Figures_IR_FirstLast/IR_modulation_firstlast_summary_' BANDS(b).name '.png'], '-dpng', '-r110'); end
+    sgtitle(sprintf('Residents - %s %s: first vs last trial per scenario (mean +/- SD)', BANDS(b).name, mtag));
+    if SAVE_FIGS, print(f2, [D 'Figures_IR_FirstLast/IR_' mtag dtag '_firstlast_summary_' BANDS(b).name '.png'], '-dpng', '-r110'); end
 end
 
 %% 6. WHO IS IN EACH PLOT, WHO IS MISSING AND WHY ------------------------------------------------------
@@ -354,7 +364,7 @@ end
 %% 9. PART B - OUTLIER RESIDENTS --------------------------------------------------------------------------------
 % per band: resident's mean modulation over all ROIs, scenarios and the two trials used; robust z / leave-one-out z
 isOutB = false(nS, nB);
-fprintf('\nOUTLIERS (robust z > %.1f or leave-one-out z > %.1f on the resident''s mean modulation)\n', ROBUST_Z, LOO_Z);
+fprintf('\nOUTLIERS (robust z > %.1f or leave-one-out z > %.1f on the resident''s mean %s)\n', ROBUST_Z, LOO_Z, mtag);
 for b = 1:nB
     resMean = nan(nS, 1);
     for s = 1:nS
@@ -368,7 +378,7 @@ for b = 1:nB
     if REMOVE_OUTLIERS, isOutB(:, b) = (abs(robust_z(resMean)) > ROBUST_Z) | (abs(loo_z(resMean)) > LOO_Z); end
     if any(isOutB(:, b))
         fprintf('  %-6s -> removed: %s\n', BANDS(b).name, strjoin(subjects(isOutB(:, b)), ', '));
-        for s = find(isOutB(:, b))', fprintf('           %s mean modulation = %.3f (median of residents %.3f)\n', subjects{s}, resMean(s), median(resMean, 'omitnan')); end
+        for s = find(isOutB(:, b))', fprintf('           %s mean %s = %.3f (median of residents %.3f)\n', subjects{s}, mtag, resMean(s), median(resMean, 'omitnan')); end
     else
         fprintf('  %-6s -> no outliers\n', BANDS(b).name);
     end
@@ -381,7 +391,7 @@ dataB   = nan(nB, nROI, NS, nS, 2);   % for the TESTS: (:,:,:,:,1) = first unsuc
 if SAVE_FIGS && ~exist([D 'Figures_IR_FirstLast'], 'dir'), mkdir([D 'Figures_IR_FirstLast']); end
 
 for b = 1:nB
-    f = claude_figure_right(sprintf('Residents modulation unsuccessful vs successful %s', BANDS(b).name), 1100, 800);   set(f, 'Color', 'w');
+    f = claude_figure_right(sprintf('Residents %s unsuccessful vs successful %s', mtag, BANDS(b).name), 1100, 800);   set(f, 'Color', 'w');
     for r = 1:nROI
         subplot(2, 2, r);   hold on;
         mU = nan(1, NS);  sU = mU;  mS = mU;  sS = mU;
@@ -404,12 +414,12 @@ for b = 1:nB
         end
         h1 = errorbar((1:NS) - 0.18, mU, sU, 'o-', 'Color', colFirst, 'MarkerFaceColor', colFirst, 'LineWidth', 1.8, 'CapSize', 8);
         h2 = errorbar((1:NS) + 0.18, mS, sS, 's-', 'Color', colLast, 'MarkerFaceColor', colLast, 'LineWidth', 1.8, 'CapSize', 8);
-        xlim([0.5 NS + 0.5]);  xticks(1:NS);  grid on;  box on;  xlabel('Scenario');  ylabel('Modulation');
+        xlim([0.5 NS + 0.5]);  xticks(1:NS);  grid on;  box on;  xlabel('Scenario');  ylabel(METRIC);
         title(sprintf('%s   (n per scenario: %s)', roi_names{r}, strjoin(arrayfun(@num2str, squeeze(nTableB(b, r, :))', 'UniformOutput', false), ',')), 'FontSize', 10);
         if r == 1, legend([h1 h2], {'First unsuccessful', 'First successful'}, 'Location', 'best'); end
     end
-    sgtitle(sprintf('Residents - %s modulation: first unsuccessful vs first successful trial per scenario (mean +/- SD)', BANDS(b).name));
-    if SAVE_FIGS, print(f, [D 'Figures_IR_FirstLast/IR_modulation_unsucc_succ_' BANDS(b).name '.png'], '-dpng', '-r110'); end
+    sgtitle(sprintf('Residents - %s %s: first unsuccessful vs first successful trial per scenario (mean +/- SD)', BANDS(b).name, mtag));
+    if SAVE_FIGS, print(f, [D 'Figures_IR_FirstLast/IR_' mtag dtag '_unsucc_succ_' BANDS(b).name '.png'], '-dpng', '-r110'); end
 end
 
 %% 11. PART B - n TABLE AND WHO IS LEFT OUT ----------------------------------------------------------------------
@@ -460,7 +470,7 @@ runTests(dataB, 'unsucc', 'succ',       'PART B: first unsuccessful vs first suc
 effNames = {'Scenario', 'Repetition', 'Scenario x Repetition'};
 PUa = nan(nB, nROI, 3);   NNa = nan(nB, nROI);
 for b = 1:nB
-    fA = claude_figure_right(sprintf('rmANOVA modulation %s', BANDS(b).name), 1100, 800);   set(fA, 'Color', 'w');
+    fA = claude_figure_right(sprintf('rmANOVA %s %s', mtag, BANDS(b).name), 1100, 800);   set(fA, 'Color', 'w');
     for r = 1:nROI
         subjV = {};   scnV = [];   repV = {};   valV = [];
         for s = 1:nS
@@ -472,14 +482,14 @@ for b = 1:nB
         end
         Tl  = table(subjV, scnV, repV, valV, 'VariableNames', {'subject', 'scenario', 'rep', 'value'});
         axA = subplot(2, 2, r);
-        resA = claude_residents_rm2way(Tl, sprintf('Modulation | %s %s', BANDS(b).name, roi_names{r}), axA);
-        ylabel(axA, 'Modulation');
+        resA = claude_residents_rm2way(Tl, sprintf('%s | %s %s', METRIC, BANDS(b).name, roi_names{r}), axA);
+        ylabel(axA, METRIC);
         if r == 1, legend(axA, {'First trial', 'Last trial'}, 'Location', 'best'); end
         NNa(b, r) = resA.n;
         for e = 1:numel(resA.eff), PUa(b, r, e) = resA.eff(e).pUse; end
     end
-    sgtitle(sprintf('Residents, %s modulation: first vs last trial by scenario (mean +/- SD, residents with all 6 scenarios)', BANDS(b).name));
-    if SAVE_FIGS, print(fA, [D 'Figures_IR_FirstLast/IR_modulation_rmANOVA_' BANDS(b).name '.png'], '-dpng', '-r110'); end
+    sgtitle(sprintf('Residents, %s %s: first vs last trial by scenario (mean +/- SD, residents with all 6 scenarios)', BANDS(b).name, mtag));
+    if SAVE_FIGS, print(fA, [D 'Figures_IR_FirstLast/IR_' mtag dtag '_rmANOVA_' BANDS(b).name '.png'], '-dpng', '-r110'); end
 end
 fprintf('\n=== rmANOVA summary: p used (Greenhouse-Geisser if Mauchly significant) and Holm p over the %d band x ROI tests ===\n', nB * nROI);
 for e = 1:3
@@ -491,6 +501,17 @@ for e = 1:3
         end
     end
 end
+
+
+%% =====================================================================================================
+% 14. MIXED MODEL on ALL the available data (no complete-case restriction), Part A and Part B
+%   value ~ scenario * condition + (1 | resident)     condition = first/last (Part A) or unsuccessful/successful (Part B)
+%   A value that is missing is just a missing row, so no resident is lost because of one missing cell (unlike the rmANOVA).
+%   Effects coding (sum to zero), F tests with Satterthwaite degrees of freedom, Holm over the 8 band x ROI tests of each effect.
+%   Needs the Statistics and Machine Learning Toolbox (fitlme, anova).
+% =====================================================================================================
+runMixed(dataA, 'first',  'last', 'PART A: first vs last trial',                          BANDS, roi_names, METRIC);
+runMixed(dataB, 'unsucc', 'succ', 'PART B: first unsuccessful vs first successful trial', BANDS, roi_names, METRIC);
 
 
 %% ---------------------------------------------------------------------
@@ -585,5 +606,53 @@ end
 
 function o = tern(c, x, y)
     if c, o = x; else, o = y; end
+end
+
+
+function runMixed(data, name1, name2, titleStr, BANDS, roi_names, METRIC)
+% data = [band x ROI x scenario x resident x 2]; (...,1) = condition 1, (...,2) = condition 2 (NaN = missing)
+    [nB, nROI, NS, nS, ~] = size(data);
+    terms = {'scenario', 'cond', 'scenario:cond'};   effNames = {'Scenario', 'Condition', 'Scenario x Condition'};   shortN = {'Scen', 'Cond', 'Scen*Cond'};
+    PU = nan(nB, nROI, 3);   NN = nan(nB, nROI);
+    fprintf('\n\n############ MIXED MODEL, %s, %s: value ~ scenario * condition + (1|resident), condition = %s / %s ############\n', METRIC, titleStr, name1, name2);
+    for b = 1:nB
+        for r = 1:nROI
+            sid = [];   scn = [];   cd = [];   val = [];   dif = [];
+            for s = 1:nS
+                for sc = 1:NS
+                    v1 = data(b, r, sc, s, 1);   v2 = data(b, r, sc, s, 2);
+                    if ~isnan(v1), sid(end+1, 1) = s;  scn(end+1, 1) = sc;  cd(end+1, 1) = 1;  val(end+1, 1) = v1; end %#ok<AGROW>
+                    if ~isnan(v2), sid(end+1, 1) = s;  scn(end+1, 1) = sc;  cd(end+1, 1) = 2;  val(end+1, 1) = v2; end %#ok<AGROW>
+                    if ~isnan(v1) && ~isnan(v2), dif(end+1, 1) = v2 - v1; end %#ok<AGROW>
+                end
+            end
+            NN(b, r) = numel(unique(sid));
+            if NN(b, r) < 3 || numel(val) < 8, fprintf('%-5s %-11s too few data (%d residents, %d observations)\n', BANDS(b).name, roi_names{r}, NN(b, r), numel(val)); continue; end
+            tbl = table(categorical(sid), categorical(scn), categorical(cd, [1 2], {name1, name2}), val, 'VariableNames', {'subj', 'scenario', 'cond', 'value'});
+            try
+                lme = fitlme(tbl, 'value ~ scenario*cond + (1|subj)', 'DummyVarCoding', 'effects');
+                a = anova(lme, 'DFMethod', 'satterthwaite');
+                line = sprintf('%-5s %-11s %2d residents, %3d obs | mean change %s-%s %+.3f (n pairs %d) |', BANDS(b).name, roi_names{r}, NN(b, r), height(tbl), name2, name1, mean(dif), numel(dif));
+                for e = 1:3
+                    i = strcmp(strtrim(string(a.Term)), terms{e});
+                    PU(b, r, e) = a.pValue(i);
+                    line = sprintf('%s %s F(%d,%.1f)=%.2f p=%.4f |', line, shortN{e}, a.DF1(i), a.DF2(i), a.FStat(i), a.pValue(i));
+                end
+                fprintf('%s\n', line);
+            catch ME
+                fprintf('%-5s %-11s model failed: %s\n', BANDS(b).name, roi_names{r}, ME.message);
+            end
+        end
+    end
+    fprintf('\nMixed model, %s: p and Holm p over the %d band x ROI tests of each effect\n', titleStr, nB * nROI);
+    for e = 1:3
+        pv = reshape(PU(:, :, e), [], 1);   padj = reshape(claude_holm_adjust(pv), nB, nROI);
+        fprintf('--- effect: %s ---\n', effNames{e});
+        for b = 1:nB
+            for r = 1:nROI
+                fprintf('%-5s %-12s %2d residents | p=%.4f | p(Holm)=%.4f %s\n', BANDS(b).name, roi_names{r}, NN(b, r), PU(b, r, e), padj(b, r), tern(padj(b, r) < 0.05, '<-- significant', ''));
+            end
+        end
+    end
 end
 

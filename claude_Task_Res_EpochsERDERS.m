@@ -16,9 +16,11 @@ restoredefaultpath;
 addpath '/home/acatalano/Matlab/eeglab_current/eeglab2026.0.0';
 eeglab nogui;
 
-base_path  = '/home/acatalano/Desktop/Intuitive/IR_Task/ERDS';
+% ORIGINAL (common reference, before the average reference): base_path  = '/home/acatalano/Desktop/Intuitive/IR_Task/ERDS';
+base_path  = '/home/acatalano/Desktop/Intuitive/IR_Task/ERDS_avgref';   % NEW: filtered + average reference
 times_file = '/home/acatalano/Desktop/Intuitive/DataStructures/GraspERD_Times_IR.mat';
-log_file   = '/home/acatalano/Desktop/Intuitive/DataStructures/Epoching_Log_IR.mat';
+% ORIGINAL (common reference, before the average reference): log_file   = '/home/acatalano/Desktop/Intuitive/DataStructures/Epoching_Log_IR.mat';
+log_file   = '/home/acatalano/Desktop/Intuitive/DataStructures/Epoching_Log_IR_avgref.mat';   % NEW: filtered + average reference
 
 T        = load(times_file);
 subjects = T.subjects;           % same subject order as the behavioural matrices
